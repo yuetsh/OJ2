@@ -2,6 +2,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { HINT_MIN_FAILURES, isFlowchartPass } from '@oj2/contract'
 import { habitSituation, logMascotEvent, refreshMascotProfile, requestSpeech } from 'shared/mascot/behavior'
+import { findChinesePunct, fixChinesePunct, type PunctIssue } from 'shared/mascot/punct'
 import { useChallengeStore } from 'oj/store/challenge'
 import { useFlowchartStore } from 'oj/store/flowchart'
 import type { MascotSituation } from 'shared/mascot/lines'
@@ -32,6 +33,9 @@ const RESULT_SITUATION: Partial<Record<SubmissionStatus, MascotSituation>> = {
   [SubmissionStatus.real_time_limit_exceeded]: 'problem.timeout',
 }
 
+/** 停手这么久还有中文标点，她就说（再加上 Mascot.vue 那边至少等的 2.5 秒） */
+const PUNCT_PAUSE_MS = 2000
+
 /** 一道题上这么久没交、没跑例子，她就来问一句（主动开口） */
 const IDLE_MS = 15 * 60_000
 /** 连着这么多次没跑例子就交，而且错了，她就念一句 */
@@ -60,6 +64,8 @@ const FINISHED = (result: number | undefined) =>
  * 另外几件事她会主动开口（只对学生，频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
  * 没跑例子就交还错了、又犯了自己的老毛病（behavior.ts 的 habitSituation）、15 分钟没交没跑。
  * 做对了也说（priority：不受频率上限管，等点评弹框关了再说）；第一次做对的题攒了一条小鱼干，多半说这个。
+ * 代码里混进了中文标点（shared/mascot/punct.ts），停手 PUNCT_PAUSE_MS 以后她指出第几行，能一键换成英文的；
+ * 点她的时候有中文标点也先说这个（多半就是编译不过的原因）。
  *
  * `showResult` 是「我错在哪」：把左栏切到「结果」页签的那一段（提交结果 / 运行例子），页签归页面管。
  */
@@ -94,7 +100,42 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const submit: MascotAction | null = busy
       ? null
       : { label: '提交', run: () => submissionStore.submit({ contestId: entry.contestId, problemSetId: entry.problemSetId }) }
-    return { runSamples, help, why, whySamples, submit }
+    // 协作中（举手了、老师在帮）不替学生改代码：编辑器正和对方同步
+    const fixPunct: MascotAction | null =
+      collabStore.helpStatus === 'idle'
+        ? {
+            label: '帮我换掉',
+            run: () => {
+              const issues = findChinesePunct(codeStore.code.value, codeStore.code.language)
+              if (issues.length) codeStore.setCode(fixChinesePunct(codeStore.code.value, issues))
+            },
+          }
+        : null
+    return { runSamples, help, why, whySamples, submit, fixPunct }
+  }
+
+  /**
+   * 编辑器里第几行在屏幕上的高度（行号那一格的中线）。CodeMirror 只画看得见的行，滚出去的拿不到，
+   * 就是 null；行号栏里有一格看不见的占位（量宽度用的），跳过
+   */
+  function editorLineY(line: number) {
+    for (const el of document.querySelectorAll<HTMLElement>('.problem-editor .cm-lineNumbers .cm-gutterElement')) {
+      if (el.textContent !== String(line) || el.style.visibility === 'hidden') continue
+      const rect = el.getBoundingClientRect()
+      if (rect.height && rect.top >= 0 && rect.bottom <= window.innerHeight) return rect.top + rect.height / 2
+    }
+    return null
+  }
+
+  /** 中文标点那句：一处说是什么、在第几行；好几处说一共几处、从第几行起 */
+  function punctGuide(issues: PunctIssue[], fix: MascotAction | null): MascotGuide {
+    const first = issues[0]!
+    return {
+      situation: issues.length > 1 ? 'problem.chinesePuncts' : 'problem.chinesePunct',
+      n: issues.length,
+      vars: { line: first.line, name: first.name, ch: first.ch },
+      actions: fix ? [fix] : [],
+    }
   }
 
   const guide = (situation: MascotSituation, ...actions: (MascotAction | null)[]): MascotGuide => ({
@@ -128,6 +169,9 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     }
     // 正在判、正在跑例子：没什么好说的，打个招呼
     if (submissionStore.judging || submissionStore.pending || submissionStore.trial.samplesRunning.value) return null
+
+    const punct = findChinesePunct(codeStore.code.value, codeStore.code.language)
+    if (punct.length) return punctGuide(punct, studentActions(problem).fixPunct)
 
     const stuck = problemStore.failCount >= STUCK_FAILS
     if (submissionStore.syntaxErrorInfo) return stuck ? guide('problem.stuck', help, why) : guide('problem.compileError', why, help)
@@ -252,7 +296,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       if (!id || !FINISHED(result) || !problem || !student()) return
       refreshMascotProfile(true)
       if (result === SubmissionStatus.accepted) {
-        requestSpeech({ key: `ac:${problem.id}`, situation: acceptedSituation(problem._id), priority: true })
+        requestSpeech({ key: `ac:${problem.id}`, situation: acceptedSituation(problem._id), priority: true, cheer: true })
         return
       }
       const failed = RESULT_SITUATION[result as SubmissionStatus]
@@ -277,6 +321,27 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const fails = problemStore.failCount
     return fails === 0 ? 'problem.firstTry' : fails >= FINALLY_FAILS ? 'problem.finally' : 'problem.accepted'
   }
+
+  // 停手一会儿还有中文标点：指出来。同一处（第几行、哪个字）一次页面会话只说一回
+  watchDebounced(
+    () => [codeStore.code.value, codeStore.code.language] as const,
+    ([code, language]) => {
+      const problem = problemStore.problem
+      if (!problem || !student()) return
+      const issues = findChinesePunct(code, language)
+      const first = issues[0]
+      if (!first) return
+      const stillThere = () => findChinesePunct(codeStore.code.value, codeStore.code.language).some((it) => it.ch === first.ch && it.line === first.line)
+      requestSpeech({
+        key: `punct:${problem.id}:${first.line}:${first.ch}`,
+        ...punctGuide(issues, studentActions(problem).fixPunct),
+        priority: true,
+        valid: stillThere,
+        anchorY: () => editorLineY(first.line),
+      })
+    },
+    { debounce: PUNCT_PAUSE_MS },
+  )
 
   // 盯着一道没做对的题 15 分钟，没交也没跑：问一句
   useIntervalFn(() => {

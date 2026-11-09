@@ -47,6 +47,7 @@ const tiles = computed(() => {
     { label: '拎着摇晕', value: c.shakes },
     { label: '挠痒', value: c.tickles },
     { label: '喂小鱼干', value: c.feeds },
+    { label: '换衣服', value: c.dresses },
   ]
 })
 

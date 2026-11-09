@@ -1,4 +1,4 @@
-import { MASCOT_FISH_GIFT, type MascotEventInput, type MascotProfile } from '@oj2/contract'
+import { MASCOT_FISH_GIFT, MASCOT_OUTFIT_COST, MASCOT_OUTFIT_NONE, type MascotEventInput, type MascotProfile } from '@oj2/contract'
 import api from 'utils/api'
 import { useUserStore } from 'shared/store/user'
 import type { MascotGuide } from './guide'
@@ -11,12 +11,15 @@ import type { MascotSituation } from './lines'
  * 只对学生。老师的话不跟着行为变。
  */
 
-/** 记一条互动。只记登录了的，失败就算了：前台不等它、也不提示 */
-export function logMascotEvent(event: Omit<MascotEventInput, 'path'>) {
-  if (!useUserStore().isAuthed) return
+/** 记一条互动。只记登录了的，失败就算了：前台一般不等它、也不提示（换衣服要等它落库再拉数） */
+export function logMascotEvent(event: Omit<MascotEventInput, 'path'>): Promise<void> {
+  if (!useUserStore().isAuthed) return Promise.resolve()
   const body: MascotEventInput = { ...event, path: location.pathname.slice(0, 200) }
   if (body.line) body.line = body.line.slice(0, 100)
-  api.post('mascot/events', body).catch(() => {})
+  return api.post('mascot/events', body).then(
+    () => {},
+    () => {},
+  )
 }
 
 export const mascotProfile = shallowRef<MascotProfile | null>(null)
@@ -39,8 +42,9 @@ export function refreshMascotProfile(force = false) {
       const userId = userStore.user?.id ?? null
       if (userId !== fishUserId) {
         fishUserId = userId
-        fishBase = profile.fish.fed
-        fedLocally.value = 0
+        fishBase = profile.fish.fed + profile.fish.spent
+        usedLocally.value = 0
+        outfitWorn.value = undefined
       }
       mascotProfile.value = profile
       loadedAt = Date.now()
@@ -55,22 +59,36 @@ export function refreshMascotProfile(force = false) {
 // ---- 小鱼干 ----
 
 /**
- * 喂掉的数前台先记着：喂一条就发一条 feed 事件，不等它落库，接着拉回来的数可能还没算上刚喂的那条。
- * 所以按「拉到这个人的第一份数时已喂的 + 这一页里喂的」和后端的数取大的，数字不会往回跳
+ * 用掉的数（喂的、换衣服花的）前台先记着：喂一条就发一条 feed 事件，不等它落库，接着拉回来的数
+ * 可能还没算上刚喂的那条。所以按「拉到这个人的第一份数时已用的 + 这一页里用的」和后端的数取大的，
+ * 数字不会往回跳
  */
 let fishUserId: number | null = null
 let fishBase = 0
-const fedLocally = ref(0)
+const usedLocally = ref(0)
 
 /** 手里还剩几条小鱼干（只对学生，没拉到数是 0） */
 export const fishLeft = computed(() => {
   const fish = mascotProfile.value?.fish
   if (!fish) return 0
-  return Math.max(0, MASCOT_FISH_GIFT + fish.earned - Math.max(fish.fed, fishBase + fedLocally.value))
+  return Math.max(0, MASCOT_FISH_GIFT + fish.earned - Math.max(fish.fed + fish.spent, fishBase + usedLocally.value))
 })
 
 export function noteFed() {
-  fedLocally.value++
+  usedLocally.value++
+}
+
+/** 这一页里刚换的衣服（undefined 是没换过，按后端的数）；null 是换回平时那身 */
+const outfitWorn = ref<string | null | undefined>(undefined)
+
+/** 她今天穿的衣服，没换是 null */
+export const mascotOutfit = computed(() => (outfitWorn.value !== undefined ? outfitWorn.value : (mascotProfile.value?.outfit ?? null)))
+
+/** 换一身（null 是换回平时那身，不花鱼）。鱼不够的前台不让点，后端也会拦 */
+export function dressMascot(outfit: string | null, line: string) {
+  if (outfit) usedLocally.value += MASCOT_OUTFIT_COST
+  outfitWorn.value = outfit
+  return logMascotEvent({ kind: 'dress', action: outfit ?? MASCOT_OUTFIT_NONE, line })
 }
 
 /** 刚回答了她的问题：先记在手里的这份数上，不等下次拉（不然 30 秒内可能又问一遍） */
@@ -246,6 +264,15 @@ export interface MascotSpeech extends MascotGuide {
    * 跟着换了页面也照说
    */
   priority?: boolean
+  /** priority 的话：先换上欢呼的图（做对了用） */
+  cheer?: boolean
+  /** priority 的话要等一会儿才说：说之前再问一遍还算不算数（比如中文标点已经改掉了就不说了） */
+  valid?: () => boolean
+  /**
+   * priority 的话说的是屏幕上某个地方（第几行代码）：给出那里的视口纵坐标，她滑到屏幕右边那个高度探头说，
+   * 说完回原处。拿不到（滚出去了）是 null，就在原地说
+   */
+  anchorY?: () => number | null
 }
 
 /** 页面请她主动说一句；说不说、什么时候说由 Mascot.vue 按频率上限定 */

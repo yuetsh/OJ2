@@ -138,6 +138,8 @@ interface ChatContext {
   /** 好感档位 0～4（behavior.ts） */
   tier: number
   todaySolved: number
+  /** 穿着同学拿小鱼干换的衣服 */
+  dressed: boolean
   /** 问过的问题和回答（id → 选项键）；还没拉到就是 null，这时不问也不翻 */
   answers: Record<string, string> | null
 }
@@ -175,7 +177,7 @@ export function chooseChat(ctx: ChatContext): MascotChat {
   const { month, hour } = wallClock()
   const unasked = ctx.answers ? MASCOT_QUESTIONS.filter((q) => !(q.id in ctx.answers!)) : []
   const answered = ctx.answers ? MASCOT_QUESTIONS.filter((q) => q.id in ctx.answers!) : []
-  type Kind = 'self' | 'hungry' | 'sleepy' | 'season' | 'trivia' | 'ask' | 'recall' | 'affinity' | 'today'
+  type Kind = 'self' | 'hungry' | 'sleepy' | 'season' | 'trivia' | 'ask' | 'recall' | 'affinity' | 'today' | 'outfit'
   const kind = weighted<Kind>([
     ['self', 20],
     ['hungry', hour >= 11 && hour < 13 ? 20 : hour >= 16 ? 10 : 4],
@@ -186,6 +188,7 @@ export function chooseChat(ctx: ChatContext): MascotChat {
     ['recall', answered.length ? 8 : 0],
     ['affinity', ctx.tier > 0 ? 10 : 0],
     ['today', ctx.todaySolved >= 3 ? 6 : 0],
+    ['outfit', ctx.dressed ? 12 : 0],
   ])
   switch (kind) {
     case 'hungry':
@@ -208,6 +211,8 @@ export function chooseChat(ctx: ChatContext): MascotChat {
       return { type: 'line', situation: `affinity.${ctx.tier}` as MascotSituation }
     case 'today':
       return { type: 'line', situation: 'today.count' }
+    case 'outfit':
+      return { type: 'line', situation: 'chat.outfit', keepPose: true }
     default:
       return { type: 'line', situation: 'chat.self' }
   }

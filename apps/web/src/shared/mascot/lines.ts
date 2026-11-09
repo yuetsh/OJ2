@@ -373,10 +373,25 @@ export const MASCOT_LINES = {
   'feed.forgive': ['……看在小鱼干的份上', '哼，原谅你了', '吃人嘴短……行吧'],
   // 睡着了被喂醒
   'feed.wake': ['……有鱼的味道', '谁、谁在喂我', '醒了醒了，鱼呢'],
-  // 点了小鱼干没拖过来
-  'feed.tease': ['拖过来啊', '光看着不给？', '那是我的鱼', '拿过来嘛', '就在那，够不着'],
   // 做对了一道新题，攒了一条
   'problem.acceptedFish': ['做对了，小鱼干 +1', '又一条小鱼干，拿来', '对了！鱼呢？', '这道换一条小鱼干，不亏', '小鱼干到手……是我的'],
+
+  // ---- 换衣服：拿小鱼干换，穿到当天结束（Mascot.vue 的衣柜）----
+  dress: ['新衣服！……还行吧', '好看吗？才不是问你', '哼，还挺合身', '今天就穿这身了', '破费了……谢谢', '转一圈给你看……才不转'],
+  'dress.off': ['换回来了', '还是这身舒服', '衣服收好了，下次再穿'],
+  // 闲聊时穿着换的衣服
+  'chat.outfit': ['这身衣服是你给的，记着呢', '今天穿得怎么样', '别人问起来，我就说是你送的', '这身……还挺喜欢的'],
+
+  // ---- 中文标点（shared/mascot/punct.ts）：{line} 第几行，{name} 中文逗号之类，{ch} 那个字符 ----
+  'problem.chinesePunct': [
+    '第 {line} 行有个{name}「{ch}」',
+    '第 {line} 行，「{ch}」是{name}',
+    '「{ch}」？第 {line} 行，换成英文的',
+    '{name}混进来了，第 {line} 行',
+    '输入法没切回来吧，第 {line} 行「{ch}」',
+  ],
+  // 好几处
+  'problem.chinesePuncts': ['{n} 处中文标点，第一处在第 {line} 行', '一共 {n} 个中文标点，从第 {line} 行开始', '中文输入法没关？{n} 处了'],
 } as const satisfies Record<string, readonly string[]>
 
 export type MascotSituation = keyof typeof MASCOT_LINES

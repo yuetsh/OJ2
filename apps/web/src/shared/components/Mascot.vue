@@ -19,6 +19,9 @@
  *   带按钮回答。正在敲键盘、刚冒过气泡、比赛里都不说；睡着了说梦话，不醒。
  * - 小鱼干：学生做对新题攒（behavior.ts 的 fishLeft），脚边一个小牌子写着几条，拖到她身上就喂了，
  *   两分钟喂到 FULL_AFTER 条就饱了、一会儿再喂；生闷气时喂一条就哄好了，睡着了喂醒。
+ * - 衣柜：点一下小鱼干牌子打开，拿 MASCOT_OUTFIT_COST 条换一身（节日装、睡衣），穿到当天结束；换回平时那身不花鱼。
+ * - 指着说：题目页发来带 anchorY 的话（中文标点在第几行），她滑到屏幕右边那一行的高度探头说，
+ *   气泡收了（说完、点了按钮、换页面）就滑回原处；这期间被拖走就留在拖到的地方。
  * - 做对了（题目页发来 priority 的话）：马上换高兴的图，等点评弹框关了再说，不受主动开口的频率上限管。
  * - 摆弄：拖着一甩松手会飞出去，撞边回弹、落到底边晕一会儿；拎着来回摇会被摇晕；鼠标不按键在她身上
  *   来回蹭是挠痒；藏在屏幕边上被点到，说「被发现了」。
@@ -36,6 +39,7 @@
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import { dailyPose, festivalPose, napPose, PEEK_SIZE, pick as pickOne, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
+import { MASCOT_OUTFIT_COST, MASCOT_OUTFITS } from '@oj2/contract'
 import { chooseChat, type MascotQuestion } from 'shared/mascot/chat'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import {
@@ -47,7 +51,9 @@ import {
   notePoke,
   personalize,
   refreshMascotProfile,
+  dressMascot,
   fishLeft,
+  mascotOutfit,
   noteFed,
   speechRequest,
   type MascotSpeech,
@@ -113,6 +119,8 @@ const TICKLE_MS = 1600
 const TICKLE_COOLDOWN_MS = 8000
 // 藏在边上被点到，有这么大的机会说「被发现了」（不然照常说页面的事）
 const PEEK_FOUND_CHANCE = 0.6
+// 右边探头那张图，脸在框高的这个位置（指着某一行时拿脸对准那一行）
+const PEEK_FACE = 0.38
 // 小鱼干：这么短时间里喂到这么多条就饱了，饱这么久
 const FULL_AFTER = 5
 const FULL_WINDOW_MS = 2 * 60_000
@@ -448,6 +456,9 @@ function onUp() {
   pressed.value = false
   if (moved) {
     dragging.value = false
+    // 正指着东西被拖走：就留在拖到的地方，不回去了
+    home = null
+    visitingSituation = null
     const velocity = releaseVelocity()
     if (velocity && reducedMotion.value !== 'reduce') return fling(velocity.vx, velocity.vy)
     const vw = document.documentElement.clientWidth
@@ -713,9 +724,11 @@ function speakSoon(speech: MascotSpeech) {
   spokenKeys.add(speech.key)
   napping.value = false
   touched()
-  cheering.value = true
-  clearTimeout(cheerTimer)
-  cheerTimer = setTimeout(() => (cheering.value = false), CHEER_MS)
+  if (speech.cheer) {
+    cheering.value = true
+    clearTimeout(cheerTimer)
+    cheerTimer = setTimeout(() => (cheering.value = false), CHEER_MS)
+  }
   const since = performance.now()
   clearInterval(priorityTimer)
   priorityTimer = setInterval(() => {
@@ -724,12 +737,44 @@ function speakSoon(speech: MascotSpeech) {
     if (waited < PRIORITY_MIN_DELAY_MS || document.querySelector('.n-modal-mask') || dragging.value || flying.value || document.visibilityState !== 'visible')
       return
     clearInterval(priorityTimer)
-    if (silent.value) return
+    if (silent.value || speech.valid?.() === false) return
     const text = fillLine(pick(speech.situation), speech)
     say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
     logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
+    const y = speech.anchorY?.()
+    if (y !== undefined && y !== null) visit(y, speech.situation)
   }, 400)
 }
+
+// ---- 指着说：滑到屏幕右边某个高度探头，说完回原处 ----
+/** 去指东西之前在哪（不存 localStorage：这只是临时过去一下） */
+let home: Place | null = null
+let visitingSituation: string | null = null
+
+function visit(y: number, situation: string) {
+  if (dragging.value || flying.value) return
+  if (!home) home = { ...place }
+  visitingSituation = situation
+  place.peek = 'right'
+  // 探头那张脸在上部：让脸对着那一行，不是整个框的中线
+  place.y = y - PEEK_SIZE.right.height * PEEK_FACE
+  peek.value = 'right'
+  settle()
+}
+
+function goHome() {
+  if (!home) return
+  Object.assign(place, home)
+  peek.value = home.peek
+  home = null
+  visitingSituation = null
+  settle()
+}
+
+// 气泡收了、换成别的话了，就回去
+watch(bubble, (now) => {
+  if (home && now?.situation !== visitingSituation) goHome()
+})
 
 // ---- 小鱼干 ----
 const isStudent = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbove)
@@ -737,7 +782,10 @@ const isStudent = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbo
 const fishDrag = ref<{ x: number; y: number } | null>(null)
 let fishStart = { x: 0, y: 0 }
 const fishNear = ref(false)
-const showFish = computed(() => isStudent.value && !silent.value && !peek.value && !dragging.value && !flying.value && fishLeft.value > 0)
+// 穿着换的衣服时鱼花光了也留着牌子：衣柜从这里开，还能换回来
+const showFish = computed(
+  () => isStudent.value && !silent.value && !peek.value && !dragging.value && !flying.value && (fishLeft.value > 0 || !!mascotOutfit.value),
+)
 /** 多了一条时牌子蹦一下 */
 const fishBump = ref(false)
 watch(fishLeft, (now, before) => {
@@ -757,7 +805,8 @@ function onFishDown(e: PointerEvent) {
   e.preventDefault()
   ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   fishStart = { x: e.clientX, y: e.clientY }
-  fishDrag.value = { x: e.clientX, y: e.clientY }
+  // 鱼花光了只剩衣柜可开，没有鱼可拖
+  if (fishLeft.value > 0) fishDrag.value = { x: e.clientX, y: e.clientY }
 }
 
 function onFishMove(e: PointerEvent) {
@@ -769,21 +818,57 @@ function onFishMove(e: PointerEvent) {
 }
 
 function onFishUp(e: PointerEvent) {
-  if (!fishDrag.value) return
+  const moved = Math.hypot(e.clientX - fishStart.x, e.clientY - fishStart.y)
+  const held = !!fishDrag.value
   fishDrag.value = null
   fishNear.value = false
-  const moved = Math.hypot(e.clientX - fishStart.x, e.clientY - fishStart.y)
-  // 只点了一下，没拖：她嫌你光看不给
-  if (moved < 4) {
-    const text = pick('feed.tease')
-    say({ text, pose: situationPose('feed.tease'), situation: 'feed.tease' })
-    logMascotEvent({ kind: 'open', situation: 'feed.tease', line: text })
-    return
-  }
+  // 只点了一下，没拖：开关衣柜
+  if (moved < 4) return toggleWardrobe()
+  if (!held) return
   const pad = 20
   const inside = e.clientX > pos.x - pad && e.clientX < pos.x + WIDTH + pad && e.clientY > pos.y - pad && e.clientY < pos.y + HEIGHT + pad
   if (inside) feed()
 }
+
+// ---- 衣柜：拿小鱼干给她换衣服 ----
+const wardrobeOpen = ref(false)
+const wardrobeEl = ref<HTMLElement>()
+const outfits = computed(() => {
+  const worn = mascotOutfit.value
+  return [
+    { outfit: null, url: poseUrl('idle'), worn: !worn, affordable: true },
+    ...MASCOT_OUTFITS.map((outfit) => ({ outfit, url: poseUrl(outfit), worn: worn === outfit, affordable: fishLeft.value >= MASCOT_OUTFIT_COST })),
+  ]
+})
+
+// 开衣柜时她不说话（气泡会被衣柜挡住），只眼巴巴地等着挑
+function toggleWardrobe() {
+  wardrobeOpen.value = !wardrobeOpen.value
+  if (!wardrobeOpen.value) return
+  close()
+  touched()
+  logMascotEvent({ kind: 'open', situation: 'wardrobe' })
+}
+
+/** 换上一身（null 是换回平时那身）。穿的那身由 restPose 接上，说话时不换图 */
+function dress(outfit: string | null) {
+  if (outfit && fishLeft.value < MASCOT_OUTFIT_COST) return
+  wardrobeOpen.value = false
+  touched()
+  idlePose.value = null
+  const situation = outfit ? 'dress' : 'dress.off'
+  const text = pick(situation)
+  say({ text, situation })
+  void dressMascot(outfit, text).then(() => refreshMascotProfile(true))
+}
+
+// 点小鱼干牌子是开关衣柜（onFishUp 管），不算「点了别处」
+onClickOutside(wardrobeEl, () => (wardrobeOpen.value = false), { ignore: ['.mascot .fish'] })
+watch(
+  () => route.fullPath,
+  () => (wardrobeOpen.value = false),
+)
+watch([dragging, flying, silent], ([drag, fly, quiet]) => (drag || fly || quiet) && (wardrobeOpen.value = false))
 
 /** 喂一条：饱了就不吃（鱼不扣）；生着闷气就哄好了；睡着就喂醒了 */
 function feed() {
@@ -841,6 +926,7 @@ function chat() {
     idlePose: idlePose.value,
     napping: napping.value,
     tier: affinityTier(),
+    dressed: !!mascotOutfit.value,
     todaySolved: profile?.todaySolved ?? 0,
     answers: profile?.answers ?? null,
   })
@@ -901,7 +987,9 @@ watchEffect(() => Object.assign(mascotBox, { x: pos.x, y: pos.y, width: size.val
 // ---- 立绘 ----
 
 /** 平时那张：节日当天换节日装。页面开着跨过零点也不换，刷新才换 */
-const restPose: MascotPose = festivalPose() ?? 'idle'
+const festival = festivalPose()
+/** 平时那张：拿小鱼干换了衣服就是那身，不然节日当天是节日装 */
+const restPose = computed<MascotPose>(() => (mascotOutfit.value as MascotPose | null) ?? festival ?? 'idle')
 const pose = computed<MascotPose>(() => {
   // 缩在边上时一直是探头那张：别的姿势都是全身的，塞不进探头的框
   if (peek.value) return `peek-${peek.value}`
@@ -910,10 +998,10 @@ const pose = computed<MascotPose>(() => {
   if (patting.value) return giggling.value ? 'giggle' : 'patted'
   if (tickled.value) return 'giggle'
   if (cheering.value && !bubble.value) return 'cheer'
-  if (fishNear.value) return 'excited'
+  if (fishNear.value || wardrobeOpen.value) return 'excited'
   if (bubble.value?.pose) return bubble.value.pose
   if (sulking.value) return 'fuming'
-  return idlePose.value ?? restPose
+  return idlePose.value ?? restPose.value
 })
 
 // ---- 没人理她：换日常、打盹 ----
@@ -1067,6 +1155,24 @@ onBeforeUnmount(() => {
     >
       <svg class="fish-icon" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>
       <span>{{ fishLeft }}</span>
+    </div>
+    <div v-if="wardrobeOpen && showFish" ref="wardrobeEl" class="wardrobe" :class="{ left: !flipped }">
+      <button
+        v-for="it in outfits"
+        :key="it.outfit ?? 'none'"
+        type="button"
+        class="outfit"
+        :class="{ worn: it.worn }"
+        :disabled="it.worn || !it.affordable"
+        @click="dress(it.outfit)"
+      >
+        <img :src="it.url" width="52" height="64" alt="" draggable="false" />
+        <span v-if="it.worn" class="price">穿着</span>
+        <span v-else-if="!it.outfit" class="price">平时</span>
+        <span v-else class="price"
+          ><svg class="price-fish" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>{{ MASCOT_OUTFIT_COST }}</span
+        >
+      </button>
     </div>
     <Teleport to="body">
       <svg width="0" height="0" style="position: absolute" aria-hidden="true">
@@ -1338,6 +1444,83 @@ html.dark .fish {
   height: 22px;
   pointer-events: none;
 }
+/* 衣柜：小鱼干牌子上面，和牌子同一侧 */
+.wardrobe {
+  position: absolute;
+  bottom: 52px;
+  left: calc(100% - 6px);
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 60px);
+  gap: 6px;
+  padding: 10px;
+  border: 2px solid #2b3a6b;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(20, 30, 60, 0.16);
+}
+.wardrobe.left {
+  left: auto;
+  right: calc(100% - 6px);
+}
+html.dark .wardrobe {
+  border-color: #7f94d4;
+  background: #1f2230;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.outfit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0 2px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.outfit:hover:not(:disabled) {
+  background: rgba(43, 58, 107, 0.08);
+}
+html.dark .outfit:hover:not(:disabled) {
+  background: rgba(127, 148, 212, 0.14);
+}
+.outfit.worn {
+  border-color: #2b3a6b;
+  cursor: default;
+}
+html.dark .outfit.worn {
+  border-color: #7f94d4;
+}
+.outfit:disabled:not(.worn) {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.outfit img {
+  display: block;
+  object-fit: contain;
+  object-position: 50% 100%;
+  pointer-events: none;
+}
+.price {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: #2b3a6b;
+}
+html.dark .price {
+  color: #c9d3f2;
+}
+.price-fish {
+  width: 18px;
+  height: 10px;
+}
+
 @keyframes mascot-fish-bump {
   0% {
     transform: scale(1);

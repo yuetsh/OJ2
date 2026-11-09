@@ -1,4 +1,14 @@
-import { MASCOT_FISH_SINCE, MASCOT_SPOKEN_KINDS, mascotEventSchema, type MascotJournal, type MascotProfile } from '@oj2/contract'
+import {
+  MASCOT_FISH_GIFT,
+  MASCOT_FISH_SINCE,
+  MASCOT_OUTFIT_COST,
+  MASCOT_OUTFIT_NONE,
+  MASCOT_OUTFITS,
+  MASCOT_SPOKEN_KINDS,
+  mascotEventSchema,
+  type MascotJournal,
+  type MascotProfile,
+} from '@oj2/contract'
 import { and, count, countDistinct, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
@@ -37,10 +47,19 @@ mascotRoutes.post('/mascot/events', requireAuth, async (c) => {
   const user = c.get('user')!
   if (allow(user.id)) {
     const { kind, situation, line, action, path } = parsed.data
+    // 换衣服花的是小鱼干：衣服得在单子上、鱼得够，不然不记（前台本来就不让点，这里防脚本）
+    if (kind === 'dress' && !(await canDress(user.id, action))) return success(c, null)
     await db.insert(schema.mascotEvent).values({ userId: user.id, kind, situation, line, action, path })
   }
   return success(c, null)
 })
+
+async function canDress(userId: number, outfit: string | undefined) {
+  if (outfit === MASCOT_OUTFIT_NONE) return true
+  if (!outfit || !(MASCOT_OUTFITS as readonly string[]).includes(outfit)) return false
+  const fish = await fishOf(userId)
+  return MASCOT_FISH_GIFT + fish.earned - fish.fed - fish.spent >= MASCOT_OUTFIT_COST
+}
 
 /** 跨天记得的事只翻这么多天以内的 */
 const MEMORY_DAYS = 7
@@ -100,7 +119,7 @@ async function fishOf(userId: number) {
   const s = schema.submission
   const e = schema.mascotEvent
   const since = localDateTime(MASCOT_FISH_SINCE, '00:00')
-  const [row] = await db.execute<{ earned: number; fed: number }>(sql`
+  const [row] = await db.execute<{ earned: number; fed: number; spent: number }>(sql`
     select
       (
         select count(*)::int from (
@@ -110,9 +129,25 @@ async function fishOf(userId: number) {
           having min(${s.createTime}) >= ${since}
         ) first_solved
       ) as earned,
-      (select count(*)::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'feed') as fed
+      (select count(*)::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'feed') as fed,
+      (
+        select count(*)::int * ${MASCOT_OUTFIT_COST} from ${e}
+        where ${e.userId} = ${userId} and ${e.kind} = 'dress' and ${e.action} <> ${MASCOT_OUTFIT_NONE}
+      ) as spent
   `)
-  return { earned: row?.earned ?? 0, fed: row?.fed ?? 0 }
+  return { earned: row?.earned ?? 0, fed: row?.fed ?? 0, spent: row?.spent ?? 0 }
+}
+
+/** 她今天穿的衣服：今天（东八区）最后一次 dress，换回来了（none）就是 null */
+async function outfitOf(userId: number) {
+  const e = schema.mascotEvent
+  const [row] = await db
+    .select({ outfit: e.action })
+    .from(e)
+    .where(and(eq(e.userId, userId), eq(e.kind, 'dress'), gte(e.createdAt, dayStart())))
+    .orderBy(desc(e.createdAt))
+    .limit(1)
+  return row?.outfit && row.outfit !== MASCOT_OUTFIT_NONE ? row.outfit : null
 }
 
 /** 见过她哪些样子：pose 事件的姿势名，去重 */
@@ -135,7 +170,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish, poses] = await Promise.all([
+  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish, poses, outfit] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -182,6 +217,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
       .orderBy(e.situation, desc(e.createdAt)),
     fishOf(userId),
     posesOf(userId),
+    outfitOf(userId),
   ])
   const eventCount = (kind: string) => weekEvents.find((row) => row.kind === kind)?.value ?? 0
 
@@ -197,6 +233,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
     fish,
+    outfit,
     poses,
     answers: Object.fromEntries(answers.filter((row) => row.situation?.startsWith('ask.') && row.action).map((row) => [row.situation!.slice(4), row.action!])),
     week: {
@@ -221,7 +258,7 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
   const userId = c.get('user')!.id
   const e = schema.mascotEvent
   // 「碰她」只算对她做的事，跑例子、举手不算
-  const touched = inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed'])
+  const touched = inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'dress'])
   const mine = eq(e.userId, userId)
   const hour = sql<number>`extract(hour from ${localTime(e.createdAt)})::int`
   const page = sql<string>`split_part(${e.path}, '/', 2)`
@@ -239,11 +276,12 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
         flings: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'fling'))::int`,
         shakes: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'shake'))::int`,
         feeds: sql<number>`(count(*) filter (where ${e.kind} = 'feed'))::int`,
+        dresses: sql<number>`(count(*) filter (where ${e.kind} = 'dress' and ${e.action} <> ${MASCOT_OUTFIT_NONE}))::int`,
         tickles: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'tickle'))::int`,
         spoken: sql<number>`(count(*) filter (where ${e.kind} = 'speak'))::int`,
       })
       .from(e)
-      .where(and(mine, inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'speak']))),
+      .where(and(mine, inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'dress', 'speak']))),
     db.select({ hour, value: count() }).from(e).where(and(mine, touched)).groupBy(hour),
     db.select({ page, value: count() }).from(e).where(and(mine, touched)).groupBy(page).orderBy(desc(count())).limit(1),
     db
