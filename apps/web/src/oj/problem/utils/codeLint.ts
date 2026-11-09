@@ -331,16 +331,38 @@ function lintC(code: string, s: string): LintIssue[] {
   return issues
 }
 
+/**
+ * 句号「。」、顿号「、」：现成的中文标点表（PUNCTUATION_MAP）里没有它们（没有一一对应的英文字符），
+ * 这里另找。先按那张表换一遍（中文引号变成英文的，引号里的就成了字符串），再在字符串、注释之外找，
+ * 免得把 “你好。” 里的句号也删了。表里的替换都是一个字换一个字，下标不变
+ */
+function findStopsAndCommas(code: string, language: string) {
+  const swapped = replaceAt(code, findChinesePunctuation(code, language))
+  const s = blankStringsAndComments(swapped, language)
+  const edits: { from: number; to: number; insert: string; name: string }[] = []
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '。') edits.push({ from: i, to: i + 1, insert: '', name: '句号' })
+    else if (s[i] === '、') edits.push({ from: i, to: i + 1, insert: ',', name: '顿号' })
+  }
+  return edits
+}
+
 /** 这段代码里能指出来的错，按行排。有中文标点就只说中文标点（中文引号会让别的规则看走眼） */
 export function lintCode(code: string, language: string): LintIssue[] {
   if (language !== 'Python' && language !== 'C' && language !== 'C++') return []
-  const punct = findChinesePunctuation(code, language)
+  const punct = [
+    ...findChinesePunctuation(code, language).map((it) => ({ ...it, name: PUNCTUATION_NAMES[code[it.from]!] ?? '标点' })),
+    ...findStopsAndCommas(code, language),
+  ].sort((a, b) => a.from - b.from)
   if (punct.length) {
     const first = punct[0]!
     const line = lineOf(code, first.from)
-    const name = PUNCTUATION_NAMES[code[first.from]!] ?? '标点'
-    const fixAll = (src: string) => replaceAt(src, findChinesePunctuation(src, language))
-    return [{ rule: 'punct', line, vars: { name, n: punct.length }, key: `punct:${line}:${name}`, fix: fixAll }]
+    // 句号要删、顿号换逗号，别的照表换；换完再找一遍句号顿号（下标是按换过的算的，一个字换一个字所以对得上）
+    const fixAll = (src: string) => {
+      const table = findChinesePunctuation(src, language)
+      return replaceAt(src, [...table, ...findStopsAndCommas(src, language)])
+    }
+    return [{ rule: 'punct', line, vars: { name: first.name, n: punct.length }, key: `punct:${line}:${first.name}`, fix: fixAll }]
   }
   const s = blankStringsAndComments(code, language)
   const issues = language === 'Python' ? lintPython(code, s) : lintC(code, s)

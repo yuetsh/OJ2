@@ -52,8 +52,14 @@ const LINT_SITUATION: Record<Exclude<LintRule, 'punct'>, MascotSituation> = {
   noInclude: 'lint.noInclude',
 }
 
-/** 停手这么久还有常见的错，她就说（再加上 Mascot.vue 那边至少等的 2.5 秒） */
+/** 停手这么久还有常见的错，她就说 */
 const LINT_PAUSE_MS = 2000
+/**
+ * 错在光标那一行、而且可能只是还没写完的（if 写了一半在想条件、正要套 int()），多等一会儿；停手这么久
+ * （从最后一次改动算）还是这样就说。中文标点、print = () 这类敲出来就是错的，不用等
+ */
+const LINT_EDITING_PAUSE_MS = 6000
+const LINT_MAYBE_UNFINISHED = new Set<LintRule>(['colon', 'noInt'])
 
 /** 一道题上这么久没交、没跑例子，她就来问一句（主动开口） */
 const IDLE_MS = 15 * 60_000
@@ -352,24 +358,37 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     return fails === 0 ? 'problem.firstTry' : fails >= FINALLY_FAILS ? 'problem.finally' : 'problem.accepted'
   }
 
-  // 停手一会儿还有常见的错：指出最靠前的那处。光标那行还在写，先不说；同一处一次页面会话只说一回
-  // （真说出口了才算，见 behavior.ts 的 spokenSpeechKeys）
+  // 停手一会儿还有常见的错：指出最靠前的那处。错在光标那行的多等一会儿（LINT_EDITING_PAUSE_MS）；
+  // 同一处一次页面会话只说一回（真说出口了才算，见 behavior.ts 的 spokenSpeechKeys）
+  let editingTimer: ReturnType<typeof setTimeout> | undefined
+  onScopeDispose(() => clearTimeout(editingTimer))
   watchDebounced(
     () => [codeStore.code.value, codeStore.code.language] as const,
     () => {
+      clearTimeout(editingTimer)
       const problem = problemStore.problem
       if (!problem || !student()) return
       const editing = activeLine()
       const keyOf = (it: LintIssue) => `lint:${problem.id}:${it.key}`
-      const issue = currentIssues().find((it) => it.line !== editing && !spokenSpeechKeys.has(keyOf(it)))
-      if (!issue) return
-      requestSpeech({
-        key: keyOf(issue),
-        ...lintGuide(issue),
-        priority: true,
-        valid: () => currentIssues().some((it) => it.key === issue.key),
-        anchorY: () => editorLineY(issue.line),
-      })
+      const fresh = currentIssues().filter((it) => !spokenSpeechKeys.has(keyOf(it)))
+      const issue = fresh.find((it) => it.line !== editing || !LINT_MAYBE_UNFINISHED.has(it.rule))
+      if (!issue) {
+        // 只有光标那行有、可能还没写完：再等等，代码一直没动就说
+        const code = codeStore.code.value
+        if (fresh.length) editingTimer = setTimeout(() => codeStore.code.value === code && point(fresh[0]!), LINT_EDITING_PAUSE_MS - LINT_PAUSE_MS)
+        return
+      }
+      point(issue)
+
+      function point(issue: LintIssue) {
+        requestSpeech({
+          key: keyOf(issue),
+          ...lintGuide(issue),
+          priority: true,
+          valid: () => currentIssues().some((it) => it.key === issue.key),
+          anchorY: () => editorLineY(issue.line),
+        })
+      }
     },
     { debounce: LINT_PAUSE_MS },
   )

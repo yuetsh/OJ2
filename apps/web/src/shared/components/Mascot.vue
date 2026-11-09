@@ -809,7 +809,14 @@ function speakSoon(speech: MascotSpeech) {
       pendingKey = null
       return clearInterval(priorityTimer)
     }
-    if (waited < PRIORITY_MIN_DELAY_MS || document.querySelector('.n-modal-mask') || dragging.value || flying.value || document.visibilityState !== 'visible')
+    // 做对了那句要等点评弹框先弹出来再看（弹框 1.5 秒后才出），别的话不用等
+    if (
+      (speech.cheer && waited < PRIORITY_MIN_DELAY_MS) ||
+      document.querySelector('.n-modal-mask') ||
+      dragging.value ||
+      flying.value ||
+      document.visibilityState !== 'visible'
+    )
       return
     clearInterval(priorityTimer)
     pendingKey = null
@@ -821,7 +828,7 @@ function speakSoon(speech: MascotSpeech) {
     logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
     const y = speech.anchorY?.()
     if (y !== undefined && y !== null) visit(y, speech.situation)
-  }, 400)
+  }, 200)
 }
 
 // ---- 指着说：滑到屏幕右边某个高度探头，说完回原处 ----
