@@ -132,8 +132,8 @@ const links = computed(() => {
       <span class="dtitle">{{ detail.problem.title }}</span>
       <span v-for="name in detail.problem.tags" :key="name" class="tag">{{ name }}</span>
       <span class="links">
-        <a :href="links.problem" target="_blank" class="link">去题目 ›</a>
-        <a :href="links.statistics" target="_blank" class="link">数据统计 ›</a>
+        <n-button size="small" tag="a" :href="links.problem" target="_blank">去题目</n-button>
+        <n-button size="small" tag="a" :href="links.statistics" target="_blank">数据统计</n-button>
       </span>
     </div>
 
@@ -209,7 +209,9 @@ const links = computed(() => {
             <span class="num strong ntries">交了 {{ row.tries }} 次</span>
             <span class="muted num">{{ gap(row.minutes) }}</span>
             <span class="grow" />
-            <a
+            <n-button
+              size="tiny"
+              tag="a"
               :href="
                 href({
                   name: 'submissions',
@@ -217,8 +219,7 @@ const links = computed(() => {
                 })
               "
               target="_blank"
-              class="link small"
-              >看代码</a
+              >看代码</n-button
             >
           </div>
         </div>
@@ -239,7 +240,7 @@ const links = computed(() => {
       <div class="line">
         <span class="muted small">还没做对的 {{ stuckStudents.length }} 人</span>
         <span class="grow" />
-        <a :href="links.submissions" target="_blank" class="link small">在提交列表里看 ›</a>
+        <n-button size="tiny" tag="a" :href="links.submissions" target="_blank">在提交列表里看</n-button>
       </div>
       <div class="names">
         <div v-for="row in stuckStudents" :key="row.username" class="nrow">
@@ -249,7 +250,7 @@ const links = computed(() => {
             <i :style="{ background: resultColor(row.lastResult) }" />{{ resultName(row.lastResult) }}
           </span>
           <span class="grow" />
-          <a :href="href({ path: `/submission/${row.lastSubmissionId}` })" target="_blank" class="link small">看代码</a>
+          <n-button size="tiny" tag="a" :href="href({ path: `/submission/${row.lastSubmissionId}` })" target="_blank">看代码</n-button>
         </div>
       </div>
     </div>
@@ -280,7 +281,7 @@ const links = computed(() => {
 }
 .links {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   margin-left: auto;
 }
 .stuck {
@@ -337,16 +338,6 @@ const links = computed(() => {
   font-size: 12px;
   line-height: 20px;
   background: var(--learn-soft);
-}
-.link {
-  flex-shrink: 0;
-  color: var(--learn-green-text);
-  font-size: 13px;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.link.small {
-  font-size: 12px;
 }
 .stats {
   display: grid;

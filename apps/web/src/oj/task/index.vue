@@ -703,17 +703,17 @@ function lastText(student: TaskBoardStudent) {
           {{ problem.problemDisplayId }}
         </span>
         <span v-if="board.assignedAt" class="assigned"> {{ parseTime(board.assignedAt, 'HH:mm') }} {{ board.assignedBy }} 布置 </span>
-        <n-button text type="primary" class="edit" @click="editing = 'edit'">
+        <n-button size="small" class="edit" @click="editing = 'edit'">
           <template #icon><Icon icon="ph:pencil-simple" /></template>
           {{ board.source === 'teacher' ? '改' : '布置' }}
         </n-button>
         <!-- 一天上几节内容不同的课：下一节另开一份，别把上一节的改掉（统计按布置切课） -->
-        <n-button v-if="board.source === 'teacher'" text type="primary" class="edit" @click="editing = 'new'">
+        <n-button v-if="board.source === 'teacher'" size="small" class="edit" @click="editing = 'new'">
           <template #icon><Icon icon="ph:plus" /></template>
           新的一节
         </n-button>
         <!-- 画完流程图让全班写代码：新开一节、带上这几道题（学生那边还没画完的照样看得到要画） -->
-        <n-button v-if="board.source === 'teacher' && board.mode === 'flowchart'" text type="primary" class="edit" @click="editing = 'carry'">
+        <n-button v-if="board.source === 'teacher' && board.mode === 'flowchart'" size="small" class="edit" @click="editing = 'carry'">
           <template #icon><Icon icon="ph:code" /></template>
           用这几道题写代码
         </n-button>
@@ -726,7 +726,7 @@ function lastText(student: TaskBoardStudent) {
       <!-- 布置过的每一节课：改错了班、隔天想起来补，去后台 -->
       <AdminLink v-if="isDesktop" :to="{ name: 'admin task list', query: className ? { className } : {} }">布置过的课</AdminLink>
       <!-- 任务页只管今天；以前几节课的、任意时间段的去统计（带上这个班） -->
-      <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })"> 回头看 → </n-button>
+      <n-button @click="router.push({ name: 'statistics', query: className ? { className } : {} })">回头看</n-button>
     </div>
 
     <n-empty v-if="board && !board.className" description="最近两小时没有哪个班在交题，先在上面选一个班" style="margin: 60px 0" />
@@ -748,7 +748,7 @@ function lastText(student: TaskBoardStudent) {
         <div v-if="staleLesson" class="earlier">
           <span>上一节 {{ board.assignedAt ? parseTime(board.assignedAt, 'HH:mm') : '' }} {{ board.assignedBy }} 布置</span>
           <span v-for="problem in board.problems" :key="problem.problemId" class="chip">{{ problem.problemDisplayId }}</span>
-          <n-button text type="primary" class="edit" @click="staleLessonId = null">接着看这一节</n-button>
+          <n-button size="small" class="edit" @click="staleLessonId = null">接着看这一节</n-button>
         </div>
       </section>
 
@@ -1075,8 +1075,6 @@ function lastText(student: TaskBoardStudent) {
 
 .edit {
   margin-left: 4px;
-  font-size: 14px;
-  color: v-bind('theme.textColor2');
 }
 
 /* ---------- 刚上课 ---------- */

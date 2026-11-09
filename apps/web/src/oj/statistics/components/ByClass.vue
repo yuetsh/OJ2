@@ -92,7 +92,7 @@ const classes = computed(() => {
         <span class="c-n muted">{{ row.rate }}</span>
         <span class="c-last muted">{{ row.last ? submissionDayText(row.last) : '—' }}</span>
         <span class="spacer"></span>
-        <n-button size="small" text type="primary" @click="emit('pick', row.className)"> 看这个班 → </n-button>
+        <n-button size="small" @click="emit('pick', row.className)">看这个班</n-button>
       </div>
       <div v-if="!classes.length" class="empty">这段时间没有人交</div>
       <p v-if="grid.truncated" class="note warn" :style="{ color: tone('warning').color }">

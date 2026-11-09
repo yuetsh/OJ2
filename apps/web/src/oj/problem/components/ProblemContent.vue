@@ -137,7 +137,7 @@ const astRequirements = computed(() => Object.entries(problem.value?.astRequirem
       <SectionHead icon="samples">
         例子
         <template #extra>
-          <n-button text type="primary" @click="submissionStore.revealResult('custom')">自己输入数据试试 ›</n-button>
+          <n-button size="small" @click="submissionStore.revealResult('custom')">自己输入数据试试</n-button>
         </template>
       </SectionHead>
       <SampleList :samples="samples" />

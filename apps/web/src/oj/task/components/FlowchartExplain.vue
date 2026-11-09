@@ -58,7 +58,7 @@ watch(() => props.id, load, { immediate: true })
     <div class="graph-box">
       <span v-if="renderError" class="muted">这张流程图画不出来，可能有框没连上</span>
       <div v-show="!renderError" ref="graph" class="graph"></div>
-      <span v-if="failed" class="muted">没拉下来，<a href="#" @click.prevent="load">再试一次</a></span>
+      <span v-if="failed" class="muted reload">没拉下来<n-button size="small" @click="load">再试一次</n-button></span>
     </div>
     <div v-if="detail" class="note-box">
       <template v-if="report">
@@ -144,6 +144,12 @@ watch(() => props.id, load, { immediate: true })
 
 .muted {
   color: var(--text3);
+}
+
+.reload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 768px) {

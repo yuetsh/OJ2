@@ -83,7 +83,9 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
   <!-- 做完了：先给这节课里还能挑战的，再给专题（设计稿 StkDone）。挑战一条都没有时只剩专题那句 -->
   <template v-if="lesson && !lesson.next && challenges">
     <ChallengeList :problem-ids="lessonProblemIds" :language="language" :refresh-key="refreshKey" />
-    <router-link to="/problemset" class="more">去专题继续练</router-link>
+    <router-link v-slot="{ href, navigate }" to="/problemset" custom>
+      <n-button size="small" tag="a" :href="href" class="more" @click="navigate">去专题继续练</n-button>
+    </router-link>
   </template>
 </template>
 
@@ -127,14 +129,8 @@ const lessonProblemIds = computed(() => lessonStore.activity?.problems.map((item
 }
 
 .more {
-  display: inline-block;
+  align-self: flex-start;
   margin-top: 12px;
-  font-size: 14px;
-  color: v-bind('theme.primaryColor');
-}
-
-.more:hover {
-  text-decoration: underline;
 }
 
 .next.secondary {

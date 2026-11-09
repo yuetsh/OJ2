@@ -415,7 +415,7 @@ onMounted(async () => {
           <span class="label">标签</span>
           <n-select :value="form.tags" :options="tagOptions" multiple filterable tag placeholder="选一个，或者打字建新的" @update:value="onTagsChange" />
         </div>
-        <n-button text type="primary" class="moreToggle" @click="showMore = !showMore"> 提示 · 来源 · 内存限制 {{ showMore ? '▴' : '▾' }} </n-button>
+        <n-button size="small" class="moreToggle" @click="showMore = !showMore"> 提示 · 来源 · 内存限制 {{ showMore ? '▴' : '▾' }} </n-button>
         <div v-if="showMore" class="more">
           <div class="label">提示（学生卡住时点开看）</div>
           <TextEditor v-model:value="form.hint" title="" simple :min-height="60" />
@@ -692,7 +692,6 @@ onMounted(async () => {
 
 .moreToggle {
   align-self: flex-start;
-  font-size: 13px;
 }
 
 .more {

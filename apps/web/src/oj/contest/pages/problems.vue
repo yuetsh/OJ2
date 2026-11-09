@@ -209,7 +209,9 @@ const warning = computed(() => tone('warning'))
             <b>排名</b>
             <span v-if="running" class="muted small">{{ updatedAgo }}</span>
             <div class="spacer"></div>
-            <RouterLink :to="to('contest rank')" class="link">完整排名 ›</RouterLink>
+            <RouterLink v-slot="{ href, navigate }" :to="to('contest rank')" custom>
+              <n-button size="small" tag="a" :href="href" @click="navigate">完整排名</n-button>
+            </RouterLink>
           </div>
           <RankMini :rows="rows" :me="me?.userId" />
           <div v-if="!rows.length" class="muted small empty">还没有人交题</div>
@@ -478,12 +480,6 @@ const warning = computed(() => tone('warning'))
   align-items: center;
   gap: 8px;
   padding: 0 2px 6px;
-}
-
-.link {
-  font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
 }
 
 .empty {

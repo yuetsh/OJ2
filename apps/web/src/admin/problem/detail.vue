@@ -1038,8 +1038,8 @@ onMounted(async () => {
                 :height="codeHeight(form.templates[lang].template, 4, 16)"
                 placeholder="不写就用全站默认的"
               />
-              <n-button text type="primary" size="small" class="hiddenToggle" @click="showHidden = !showHidden">
-                {{ showHidden ? '▾' : '›' }} 藏在学生代码前面 / 后面一起运行的代码（学生看不到）
+              <n-button size="tiny" class="hiddenToggle" @click="showHidden = !showHidden">
+                藏在学生代码前面 / 后面一起运行的代码（学生看不到） {{ showHidden ? '▴' : '▾' }}
               </n-button>
               <template v-if="showHidden">
                 <span class="label">前面</span>
@@ -1445,7 +1445,6 @@ onMounted(async () => {
 
 .hiddenToggle {
   align-self: flex-start;
-  font-size: 12px;
 }
 
 .modes {

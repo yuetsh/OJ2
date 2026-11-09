@@ -232,7 +232,7 @@ watch(query, () => {
   <template v-else>
     <div v-if="rankLine" class="rank" :class="{ solved: rankLine.solved }">
       <span>{{ rankLine.text }}</span>
-      <n-button v-if="userStore.showSubmissions" text type="primary" @click="goAccepted"> 看看他们的写法 › </n-button>
+      <n-button v-if="userStore.showSubmissions" size="small" @click="goAccepted">看看他们的写法</n-button>
     </div>
 
     <div v-if="statusDistribution.length" class="distribution">
@@ -298,7 +298,7 @@ watch(query, () => {
                   放回编辑器
                 </n-button>
                 <n-button size="small" @click="copy(row.id)">复制</n-button>
-                <n-button size="small" text type="primary" class="more" @click="openDetail(row.id)"> 完整详情 › </n-button>
+                <n-button size="small" class="more" @click="openDetail(row.id)">完整详情</n-button>
               </div>
             </template>
           </div>

@@ -395,7 +395,7 @@ const gridColumns = computed(() => (showStatus.value ? '40px 72px minmax(0, 1fr)
           <ProgressRow v-if="mine" :progress="mine" :start-tag="startTag" @select-tag="selectTag" />
           <div v-else-if="!userStore.isAuthed && userStore.isFinished" class="anon">
             登录以后，左边每个知识点会显示你做对了几道
-            <button class="link" @click="authStore.openLoginModal()">登录</button>
+            <n-button size="small" @click="authStore.openLoginModal()">登录</n-button>
           </div>
           <div class="spacer"></div>
           <Hitokoto class="hitokoto" />
@@ -696,20 +696,12 @@ const gridColumns = computed(() => (showStatus.value ? '40px 72px minmax(0, 1fr)
 }
 
 .anon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: v-bind('theme.textColor2');
   white-space: nowrap;
-}
-
-.link {
-  border: 0;
-  padding: 0;
-  margin-left: 8px;
-  background: transparent;
-  font: inherit;
-  font-weight: 600;
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
 }
 
 /* 1280 宽（机房 1280×1024）也要一行放下：左栏 224 之后只剩 1008，控件宽度是按它掐的，

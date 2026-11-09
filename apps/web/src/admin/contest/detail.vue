@@ -391,7 +391,7 @@ onMounted(load)
           <span class="ell grow">{{ row.title }}</span>
           <span class="muted tiny">{{ DIFFICULTY[row.difficulty] }}</span>
           <span v-if="added(row)" class="muted tiny">已加入</span>
-          <n-button v-else size="small" text type="primary" @click="add(row)">+ 加入</n-button>
+          <n-button v-else size="small" @click="add(row)">+ 加入</n-button>
         </div>
       </div>
 
@@ -411,7 +411,7 @@ onMounted(load)
           <b class="num">{{ item.displayId }}</b>
           <span class="ell grow">{{ item.title }}</span>
           <span class="muted tiny">{{ DIFFICULTY[item.difficulty as keyof typeof DIFFICULTY] }}</span>
-          <n-button v-if="editing" size="small" text type="primary" @click="editProblem(item)">改</n-button>
+          <n-button v-if="editing" size="small" @click="editProblem(item)">改</n-button>
           <n-button size="small" text :aria-label="`删掉第 ${item.displayId} 题`" @click="remove(item)">✕</n-button>
         </div>
       </div>

@@ -89,7 +89,9 @@ useMascotGuide(() => {
               <b>{{ countOf(r) }}</b>
             </span>
           </span>
-          <router-link v-if="other" to="/achievement" class="mine">看我的 ›</router-link>
+          <router-link v-if="other" v-slot="{ href, navigate }" to="/achievement" custom>
+            <n-button size="small" tag="a" :href="href" class="mine" @click="navigate">看我的</n-button>
+          </router-link>
           <div v-if="userStore.isSuperAdmin && isDesktop" class="admin-link">
             <AdminLink to="/admin/achievement/list" size="small">管理成就</AdminLink>
           </div>
@@ -179,9 +181,7 @@ h2 {
 
 .mine {
   margin-left: auto;
-  font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
+  align-self: center;
 }
 
 .top {

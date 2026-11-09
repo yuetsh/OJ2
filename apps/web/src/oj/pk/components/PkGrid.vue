@@ -140,9 +140,9 @@ const medal = (index: number) => palette.value.medal[index]
           </template>
         </div>
       </div>
-      <button v-if="compact && rows.length > SHOW_MOBILE" class="more" @click="expanded = !expanded">
-        {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
-      </button>
+      <n-button v-if="compact && rows.length > SHOW_MOBILE" size="small" class="more" @click="expanded = !expanded">
+        {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道` }}
+      </n-button>
     </div>
 
     <div class="side" :class="{ compact }">
@@ -468,14 +468,7 @@ const medal = (index: number) => palette.value.medal[index]
 }
 
 .more {
-  width: 100%;
-  height: 40px;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
+  margin: 4px 0;
 }
 
 /* ---------- 手机 ---------- */

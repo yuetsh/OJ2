@@ -156,7 +156,9 @@ const shortcuts = computed(() =>
       <div class="card-head">
         <h3>公告</h3>
         <span class="spacer"></span>
-        <router-link to="/announcement" class="more">全部</router-link>
+        <router-link v-slot="{ href, navigate }" to="/announcement" custom>
+          <n-button size="small" tag="a" :href="href" @click="navigate">全部</n-button>
+        </router-link>
       </div>
       <router-link v-for="item in announcements" :key="item.id" :to="{ path: '/announcement', query: { id: item.id } }" class="ann-row">
         <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
@@ -253,16 +255,6 @@ const shortcuts = computed(() =>
   flex: 1 1 auto;
 }
 
-.more {
-  font-size: 14px;
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-}
-
-.more:hover {
-  text-decoration: underline;
-}
-
 .minis {
   display: flex;
   flex-wrap: wrap;
@@ -318,7 +310,12 @@ const shortcuts = computed(() =>
 
 .card-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.card-head h3 {
+  margin: 0;
 }
 
 .ann-row {

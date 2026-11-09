@@ -30,7 +30,9 @@ function submissions(item: LearningItem) {
           交了 {{ item.attempts }} 次<template v-if="statusName(item.lastResult)"> · 最后一次{{ statusName(item.lastResult) }}</template>
         </div>
       </div>
-      <router-link v-if="username" :to="submissions(item)" class="link">看提交 ›</router-link>
+      <router-link v-if="username" v-slot="{ href, navigate }" :to="submissions(item)" custom>
+        <n-button size="small" tag="a" :href="href" @click="navigate">看提交</n-button>
+      </router-link>
       <n-button v-else type="primary" size="small" @click="router.push(`/problem/${item.displayId}`)"> 接着做 </n-button>
     </div>
   </section>
@@ -79,12 +81,5 @@ h3 {
 .meta {
   font-size: var(--oj-fs-meta);
   color: v-bind('theme.textColor3');
-}
-
-.link {
-  font-size: var(--oj-fs-meta);
-  color: #18a058;
-  text-decoration: none;
-  white-space: nowrap;
 }
 </style>

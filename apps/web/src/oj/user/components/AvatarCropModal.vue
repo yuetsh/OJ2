@@ -234,7 +234,7 @@ async function useLetter() {
           <span class="preview"> <RankAvatar :username="username" :avatar="avatar" :size="56" me />领奖台 </span>
           <span class="preview"> <RankAvatar :username="username" :avatar="avatar" :size="28" me />排名、顶栏 </span>
         </template>
-        <a v-if="avatar || src" href="#" class="link" :class="{ disabled: saving }" @click.prevent="!saving && useLetter()"> 不用图片，用名字的字 </a>
+        <n-button v-if="avatar || src" size="small" class="fit" :disabled="saving" @click="useLetter"> 不用图片，用名字的字 </n-button>
       </div>
     </div>
     <template #footer>
@@ -332,15 +332,6 @@ async function useLetter() {
 
 .fit {
   align-self: flex-start;
-}
-
-.link {
-  color: #18a058;
-  text-decoration: none;
-}
-
-.link.disabled {
-  opacity: 0.5;
 }
 
 .footer {

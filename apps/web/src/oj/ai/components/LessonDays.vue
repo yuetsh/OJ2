@@ -62,16 +62,16 @@ function expand(day: string) {
         <div v-if="day.own.length" class="chips">
           <span class="own">自己练</span>
           <ProblemChip v-for="item in ownOf(day)" :key="item.displayId" :item="item" :in-lesson="false" :username="username" />
-          <button v-if="day.own.length > OWN_CAP && !openOwn.has(day.day)" class="more" @click="expand(day.day)">
+          <n-button v-if="day.own.length > OWN_CAP && !openOwn.has(day.day)" size="small" @click="expand(day.day)">
             还有 {{ day.own.length - OWN_CAP }} 道 ▾
-          </button>
+          </n-button>
         </div>
       </div>
       <div v-if="!compact" class="done">
         <template v-if="day.lesson.length"> 做对 {{ day.lesson.filter(isDone).length }}/{{ day.lesson.length }} </template>
       </div>
     </div>
-    <button v-if="!showAll && days.length > DAY_CAP" class="earlier" @click="showAll = true">更早的 {{ days.length - DAY_CAP }} 天 ▾</button>
+    <n-button v-if="!showAll && days.length > DAY_CAP" size="small" class="earlier" @click="showAll = true">更早的 {{ days.length - DAY_CAP }} 天 ▾</n-button>
   </section>
 </template>
 
@@ -150,19 +150,6 @@ h3 small {
   font-size: var(--oj-fs-meta);
   color: v-bind('theme.textColor3');
   font-variant-numeric: tabular-nums;
-}
-
-.more,
-.earlier {
-  height: 30px;
-  padding: 0 12px;
-  border: 1px dashed v-bind('theme.borderColor');
-  border-radius: 6px;
-  background: transparent;
-  color: #18a058;
-  font: inherit;
-  font-size: var(--oj-fs-meta);
-  cursor: pointer;
 }
 
 .earlier {

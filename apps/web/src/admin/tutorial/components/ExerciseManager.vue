@@ -395,11 +395,11 @@ function typeName(type: ExerciseType) {
         <span v-if="placeOf(ex.id)" class="muted">在「{{ placeOf(ex.id) }}」</span>
         <template v-else>
           <span class="warn">还没放进正文</span>
-          <a href="#" @click.prevent="emit('insert', ex.id)">插到光标处</a>
+          <n-button size="tiny" @click="emit('insert', ex.id)">插到光标处</n-button>
         </template>
         <span class="grow" />
-        <a href="#" @click.prevent="openEdit(ex)">编辑</a>
-        <a href="#" class="danger" @click.prevent="confirmDelete(ex.id)">删除</a>
+        <n-button size="tiny" @click="openEdit(ex)">编辑</n-button>
+        <n-button size="tiny" type="error" ghost @click="confirmDelete(ex.id)">删除</n-button>
       </div>
     </div>
 
@@ -616,14 +616,5 @@ function typeName(type: ExerciseType) {
 }
 .warn {
   color: #c77c02;
-}
-.sub a {
-  color: #18a058;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.sub a.danger {
-  color: #d03050;
-  opacity: 0.8;
 }
 </style>

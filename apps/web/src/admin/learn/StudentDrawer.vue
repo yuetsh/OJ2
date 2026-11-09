@@ -193,14 +193,14 @@ watch(
                   <span class="kind num">{{ problem.displayId }}</span>
                   {{ problem.title }}
                 </div>
-                <div class="small num">
-                  <span v-if="problem.solved" class="ok">做对了</span>
-                  <span v-else-if="problem.submissions" class="bad">交了 {{ problem.submissions }} 次还没对</span>
-                  <span v-else class="muted">没交</span>
-                  <template v-if="problem.lastSubmitAt">
-                    <span class="muted"> · {{ parseTime(problem.lastSubmitAt, 'YYYY年M月D日') }} · </span>
-                    <a :href="submissionsHref(problem)" target="_blank" class="link">看提交</a>
-                  </template>
+                <div class="small num status">
+                  <span>
+                    <span v-if="problem.solved" class="ok">做对了</span>
+                    <span v-else-if="problem.submissions" class="bad">交了 {{ problem.submissions }} 次还没对</span>
+                    <span v-else class="muted">没交</span>
+                    <span v-if="problem.lastSubmitAt" class="muted"> · {{ parseTime(problem.lastSubmitAt, 'YYYY年M月D日') }}</span>
+                  </span>
+                  <n-button v-if="problem.lastSubmitAt" size="tiny" tag="a" :href="submissionsHref(problem)" target="_blank">看提交</n-button>
                 </div>
               </div>
             </div>
@@ -330,12 +330,10 @@ watch(
 .sub-head {
   margin-top: 4px;
 }
-.link {
-  color: #18a058;
-  text-decoration: none;
-}
-.link:hover {
-  text-decoration: underline;
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .bad {
   color: var(--bad);

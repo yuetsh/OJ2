@@ -101,8 +101,8 @@ function goStudent(username: string | null | undefined) {
       </div>
       <span v-if="isDesktop && span" class="muted">{{ span }}</span>
       <span class="grow"></span>
-      <router-link v-if="viewing" :to="{ path: '/submission', query: { username: viewing, exactUsername: '1' } }" class="link">
-        看<UserName :username="viewing" />的提交 ›
+      <router-link v-if="viewing" v-slot="{ href, navigate }" :to="{ path: '/submission', query: { username: viewing, exactUsername: '1' } }" custom>
+        <n-button size="small" tag="a" :href="href" @click="navigate">看<UserName :username="viewing" />的提交</n-button>
       </router-link>
       <AdminLink v-if="userStore.isTeacherOrAbove && isDesktop" :to="{ path: '/admin/ai/reports', query: viewing ? { username: viewing } : {} }" size="small">
         AI 报告
@@ -123,7 +123,7 @@ function goStudent(username: string | null | undefined) {
         <section v-if="!viewing && before?.unsolved.length" class="card hint">
           <b>还有 {{ before.unsolved.length }} 道差一点的</b>
           <span class="muted names">{{ before.unsolved.map((item) => item.title).join('、') }}</span>
-          <a href="#" class="link" @click.prevent="urlPeriod = 'all'">去看看 ›</a>
+          <n-button size="small" @click="urlPeriod = 'all'">去看看</n-button>
         </section>
       </template>
 
@@ -228,13 +228,6 @@ function goStudent(username: string | null | undefined) {
 .muted {
   font-size: var(--oj-fs-sec);
   color: v-bind('theme.textColor3');
-}
-
-.link {
-  font-size: var(--oj-fs-sec);
-  color: #18a058;
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .body,

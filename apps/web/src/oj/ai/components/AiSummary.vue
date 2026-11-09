@@ -92,9 +92,9 @@ const folded = computed(() => props.compact && !expanded.value && !generating.va
         <Markdown :content="content" />
       </div>
       <div v-if="!generating" class="foot">
-        <a v-if="folded" href="#" @click.prevent="expanded = true">展开全文 ▾</a>
+        <n-button v-if="folded" size="tiny" @click="expanded = true">展开全文 ▾</n-button>
         <span v-if="createdAt">{{ parseTime(createdAt, 'M月D日') }} 生成{{ pinned ? ' · 老师置顶' : '' }}</span>
-        <a href="#" @click.prevent="generate">重新分析</a>
+        <n-button size="tiny" @click="generate">重新分析</n-button>
       </div>
     </template>
     <n-spin v-else-if="waiting" size="small">
@@ -141,14 +141,10 @@ h3 {
 
 .foot {
   display: flex;
+  align-items: center;
   gap: 12px;
   font-size: var(--oj-fs-meta);
   color: v-bind('theme.textColor3');
-}
-
-.foot a {
-  color: #18a058;
-  text-decoration: none;
 }
 
 .waiting {

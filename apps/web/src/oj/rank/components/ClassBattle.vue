@@ -55,7 +55,9 @@ function shortLabel(className: string) {
   <div class="battle" :class="{ bare }">
     <div class="title">
       <b v-if="!bare">班级对抗</b><span class="muted">人均做对</span>
-      <router-link v-if="pk" :to="{ path: '/pk', query: mine ? { classes: mine } : {} }" class="pk">班级 PK ›</router-link>
+      <router-link v-if="pk" v-slot="{ href, navigate }" :to="{ path: '/pk', query: mine ? { classes: mine } : {} }" custom>
+        <n-button size="small" tag="a" :href="href" class="pk" @click="navigate">班级 PK</n-button>
+      </router-link>
     </div>
     <div v-for="item in shown" :key="item.className" class="row" :class="{ mine: item.className === mine }">
       <span class="rank">{{ item.rank }}</span>
@@ -152,10 +154,6 @@ function shortLabel(className: string) {
 
 .pk {
   margin-left: auto;
-  font-size: var(--oj-fs-meta);
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-  white-space: nowrap;
 }
 
 .mine .name {

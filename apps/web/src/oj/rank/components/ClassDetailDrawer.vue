@@ -182,8 +182,8 @@ function go(path: string, query: Record<string, string>) {
               <UserName :username="row.user.username" />
               <span class="muted">这学期 {{ row.solved }} 道 · 交过 {{ row.submissions }} 次</span>
               <div class="spacer" />
-              <a href="#" @click.prevent="go('/submission', { username: row.user.username, exactUsername: '1' })">看提交 ›</a>
-              <a href="#" @click.prevent="go('/ai-analysis', { username: row.user.username })">智能分析 ›</a>
+              <n-button size="tiny" @click="go('/submission', { username: row.user.username, exactUsername: '1' })">看提交</n-button>
+              <n-button size="tiny" @click="go('/ai-analysis', { username: row.user.username })">智能分析</n-button>
             </div>
             <span v-if="!detail.care.length" class="muted">没有，这学期人人都做对 3 道以上</span>
           </section>
@@ -213,7 +213,7 @@ function go(path: string, query: Record<string, string>) {
             <Markdown v-if="report" :content="report" />
           </section>
 
-          <a v-if="pk" href="#" class="pk" @click.prevent="go('/pk', { classes: className! })">和别的班比 → 班级 PK ›</a>
+          <n-button v-if="pk" size="small" class="pk" @click="go('/pk', { classes: className! })">班级 PK</n-button>
         </div>
         <div v-else-if="!loading" class="muted">这个班的数据没取到</div>
       </n-spin>
@@ -402,12 +402,8 @@ section {
   font-size: 13px;
 }
 
-.care a,
 .pk {
-  font-size: 13px;
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-  white-space: nowrap;
+  align-self: flex-start;
 }
 
 .spacer {

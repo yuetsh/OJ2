@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import { useThemeVars } from 'naive-ui'
 import type { SubmissionExplain } from '../composables/explain'
 
 /**
@@ -11,8 +10,6 @@ const props = defineProps<{
   explain: SubmissionExplain
   tone: { background: string; color: string }
 }>()
-
-const theme = useThemeVars()
 
 const rawOpen = ref(false)
 // 换了一条就收起来
@@ -29,10 +26,10 @@ watch(
         <template v-if="explain.line">第 {{ explain.line }} 行：</template>{{ explain.text }}
       </b>
       <div class="spacer"></div>
-      <a v-if="explain.raw" href="#" class="raw-toggle" @click.prevent="rawOpen = !rawOpen">
+      <n-button v-if="explain.raw" size="tiny" icon-placement="right" class="raw-toggle" @click="rawOpen = !rawOpen">
+        <template #icon><Icon :icon="rawOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" /></template>
         原始报错
-        <Icon :icon="rawOpen ? 'ph:caret-up-bold' : 'ph:caret-down-bold'" :width="11" />
-      </a>
+      </n-button>
     </div>
     <pre v-if="rawOpen && explain.raw" class="raw">{{ explain.raw }}</pre>
   </div>
@@ -61,16 +58,6 @@ watch(
 
 .raw-toggle {
   flex: none;
-  font-size: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-}
-
-.raw-toggle:hover {
-  text-decoration: underline;
 }
 
 .raw {

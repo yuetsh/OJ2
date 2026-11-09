@@ -56,9 +56,10 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
         <span v-for="n in exerciseCount" :key="n" class="box" :class="{ on: n <= solvedCount }" />
       </span>
       <span class="grow" />
-      <a v-if="firstUnsolved" href="#" class="link" @click.prevent="emit('jump', firstUnsolved.id)">
-        <Icon icon="ph:arrow-up-bold" :width="14" />第 {{ firstUnsolved.index }} 道还没做对
-      </a>
+      <n-button v-if="firstUnsolved" size="small" @click="emit('jump', firstUnsolved.id)">
+        <template #icon><Icon icon="ph:arrow-up-bold" /></template>
+        第 {{ firstUnsolved.index }} 道还没做对
+      </n-button>
     </section>
 
     <section v-if="problems.length" class="card problems">
@@ -176,15 +177,6 @@ const nextParts = computed(() => (props.next ? splitTitle(props.next.title) : nu
 }
 .box.on {
   background: var(--learn-green);
-}
-.link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--learn-green-text);
-  text-decoration: none;
 }
 .problems {
   overflow: hidden;

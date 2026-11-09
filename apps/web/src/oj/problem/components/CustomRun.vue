@@ -44,9 +44,7 @@ function fillSample(input: string) {
         <template #icon><Icon icon="ph:play-fill" /></template>
         用这组数据运行
       </n-button>
-      <n-button v-for="(sample, index) in problem?.samples ?? []" :key="index" text type="primary" class="fill" @click="fillSample(sample.input)">
-        填入例子 {{ index + 1 }}
-      </n-button>
+      <n-button v-for="(sample, index) in problem?.samples ?? []" :key="index" @click="fillSample(sample.input)"> 填入例子 {{ index + 1 }} </n-button>
     </div>
 
     <SectionHead icon="output" class="output-head">输出</SectionHead>
@@ -84,12 +82,8 @@ function fillSample(input: string) {
 .actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 10px;
   margin-bottom: 6px;
-}
-
-.fill {
-  font-size: 14px;
 }
 
 .output {

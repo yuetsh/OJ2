@@ -10,7 +10,7 @@ export interface ProblemReader {
 </script>
 
 <script setup lang="ts">
-import { NText } from 'naive-ui'
+import { NButton, NText } from 'naive-ui'
 import { parseTime } from 'utils/functions'
 import UserName from 'shared/components/UserName.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
@@ -42,7 +42,7 @@ function renderLink(row: ProblemReader) {
     path: '/submission',
     query: { problem: props.displayId, username: row.username, exactUsername: '1' },
   })
-  return h('a', { href, target: '_blank', class: 'link' }, '看提交')
+  return h(NButton, { size: 'small', tag: 'a', href, target: '_blank' }, () => '看提交')
 }
 
 const desktopColumns: DataTableColumn<ProblemReader>[] = [
@@ -86,13 +86,6 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
 </template>
 
 <style scoped>
-:deep(.link) {
-  color: #18a058;
-  text-decoration: none;
-}
-:deep(.link:hover) {
-  text-decoration: underline;
-}
 :deep(.m-line) {
   display: flex;
   justify-content: space-between;

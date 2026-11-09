@@ -130,7 +130,7 @@ function goAllSubmissions() {
       <template v-else>
         <ProblemSubmission />
         <div v-if="showAllSubmissions" class="all-submissions">
-          <n-button text type="primary" @click="goAllSubmissions">看这道题所有人的提交 ›</n-button>
+          <n-button size="small" @click="goAllSubmissions">看这道题所有人的提交</n-button>
         </div>
       </template>
     </n-drawer-content>
@@ -194,6 +194,5 @@ function goAllSubmissions() {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
-  font-size: 13px;
 }
 </style>

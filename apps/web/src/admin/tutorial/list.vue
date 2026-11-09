@@ -181,8 +181,8 @@ onMounted(load)
           <template v-else>
             <span class="group-name">{{ group.project || (group.hidden ? '没公开' : '没有项目') }}</span>
             <span class="muted">{{ group.items.length }} 课</span>
-            <a v-if="group.project" href="#" @click.stop.prevent="startRename(group.project)">改名</a>
-            <a href="#" @click.stop.prevent="createIn(group.project)">加一课</a>
+            <n-button v-if="group.project" size="small" @click.stop="startRename(group.project)">改名</n-button>
+            <n-button size="small" @click.stop="createIn(group.project)">加一课</n-button>
           </template>
         </div>
         <template v-if="!collapsed.has(group.key)">
@@ -212,7 +212,11 @@ onMounted(load)
             <span class="c-switch">
               <n-switch :value="item.isPublic" size="small" :rubber-band="false" @update:value="toggleVisible(item)" />
             </span>
-            <router-link :to="{ name: 'admin tutorial edit', params: { tutorialID: item.id } }" class="c-edit"> 编辑 </router-link>
+            <span class="c-edit">
+              <router-link v-slot="{ href, navigate }" :to="{ name: 'admin tutorial edit', params: { tutorialID: item.id } }" custom>
+                <n-button size="small" tag="a" :href="href" @click="navigate">编辑</n-button>
+              </router-link>
+            </span>
           </div>
         </template>
       </template>
@@ -307,11 +311,6 @@ onMounted(load)
   background: rgba(128, 128, 128, 0.06);
   border-top-color: rgba(128, 128, 128, 0.22);
 }
-.grouprow a {
-  font-size: 13px;
-  color: #18a058;
-  text-decoration: none;
-}
 .fold {
   border: 0;
   background: transparent;
@@ -383,11 +382,8 @@ onMounted(load)
   justify-content: center;
 }
 .c-edit {
-  width: 40px;
+  width: 56px;
   text-align: right;
-  font-size: 13px;
-  color: #18a058;
-  text-decoration: none;
 }
 
 /* 手机：拖动排序（触屏拖不动）、练一练数、打开过的人、情境都不摆，留 知识点 / 相关题 / 公开 / 编辑 */
@@ -409,9 +405,6 @@ onMounted(load)
     height: auto;
     min-height: 44px;
     padding: 8px 12px;
-  }
-  .grouprow a {
-    white-space: nowrap;
   }
   .c-drag,
   .c-ex,

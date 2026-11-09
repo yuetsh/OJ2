@@ -51,8 +51,12 @@ const detail = computed(() => {
     </template>
     <div class="tip">
       <span>{{ detail.filter(Boolean).join(' · ') }}</span>
-      <router-link v-if="item.status !== 'none'" :to="submissionLink">{{ username ? '看提交' : '看你的提交' }} ›</router-link>
-      <router-link v-else-if="!username" :to="problemLink">去做 ›</router-link>
+      <router-link v-if="item.status !== 'none'" v-slot="{ href, navigate }" :to="submissionLink" custom>
+        <n-button size="tiny" tag="a" :href="href" @click="navigate">{{ username ? '看提交' : '看你的提交' }}</n-button>
+      </router-link>
+      <router-link v-else-if="!username" v-slot="{ href, navigate }" :to="problemLink" custom>
+        <n-button size="tiny" tag="a" :href="href" @click="navigate">去做</n-button>
+      </router-link>
     </div>
   </n-popover>
 </template>
@@ -126,11 +130,5 @@ const detail = computed(() => {
   align-items: center;
   gap: 10px;
   font-size: var(--oj-fs-meta);
-}
-
-.tip a {
-  color: #18a058;
-  text-decoration: none;
-  white-space: nowrap;
 }
 </style>

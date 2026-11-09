@@ -51,7 +51,7 @@ const stats = computed(() => {
       big: `第 ${o.classRank.rank}`,
       unit: '名',
       sub: props.compact ? `本班 ${o.classRank.total} 人` : `本班 · 这学期 ${o.classRank.total} 人`,
-      link: props.isSelf ? { text: '看排名 ›', to: '/rank' } : undefined,
+      link: props.isSelf ? { text: '看排名', to: '/rank' } : undefined,
     })
   else if (o.rankHidden) list.push({ big: '不计入', unit: '排名', sub: '本班 · 这学期' })
   if (props.teacherView) list.push({ big: o.unsolved?.length ?? 0, unit: '道', sub: '交过还没做对', warn: true })
@@ -228,8 +228,8 @@ function onMenu(key: string) {
             <span>{{ item.unit }}</span>
           </div>
           <div class="sub">{{ item.sub }}</div>
-          <router-link v-if="item.link && !compact" :to="item.link.to" class="link">
-            {{ item.link.text }}
+          <router-link v-if="item.link && !compact" v-slot="{ href, navigate }" :to="item.link.to" custom>
+            <n-button size="tiny" tag="a" :href="href" class="link" @click="navigate">{{ item.link.text }}</n-button>
           </router-link>
         </div>
       </div>
@@ -466,9 +466,8 @@ function onMenu(key: string) {
 }
 
 .link {
-  font-size: var(--oj-fs-meta);
-  color: #18a058;
-  text-decoration: none;
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 .times {

@@ -201,9 +201,9 @@ const tab = ref<'weekly' | 'dist'>('weekly')
             <span v-else class="crown" />
           </div>
         </div>
-        <button v-if="rows.length > SHOW_MOBILE" class="more" @click="expanded = !expanded">
-          {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道 ›` }}
-        </button>
+        <n-button v-if="rows.length > SHOW_MOBILE" size="small" class="more" @click="expanded = !expanded">
+          {{ expanded ? '收起' : `再看 ${rows.length - SHOW_MOBILE} 道` }}
+        </n-button>
       </template>
     </div>
 
@@ -666,14 +666,9 @@ const tab = ref<'weekly' | 'dist'>('weekly')
 }
 
 .more {
+  display: flex;
   width: 100%;
-  height: 40px;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
+  margin: 8px 0 10px;
 }
 
 .bottom.compact {

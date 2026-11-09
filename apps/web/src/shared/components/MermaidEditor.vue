@@ -52,8 +52,8 @@ onBeforeUnmount(() => {
       <n-flex align="center">
         <span>Mermaid 代码</span>
         <n-flex align="center">
-          <n-button text @click="copyCode" size="small" type="primary"> 复制 </n-button>
-          <n-button text @click="clearCode" type="error" size="small"> 清空 </n-button>
+          <n-button size="small" @click="copyCode">复制</n-button>
+          <n-button size="small" type="error" ghost @click="clearCode">清空</n-button>
         </n-flex>
       </n-flex>
       <n-input class="code-editor" v-model:value="modelValue" type="textarea" :autosize="{ minRows: 10, maxRows: 20 }" />

@@ -26,7 +26,9 @@ const allLink = computed(() => ({
     <h3>
       成就 <small>{{ achievements.unlocked.length }} / {{ achievements.total }}</small>
       <span class="grow"></span>
-      <router-link :to="allLink" class="link">全部成就 ›</router-link>
+      <router-link v-slot="{ href, navigate }" :to="allLink" custom>
+        <n-button size="small" tag="a" :href="href" @click="navigate">全部成就</n-button>
+      </router-link>
     </h3>
     <div v-if="achievements.unlocked.length" class="grid">
       <n-tooltip v-for="item in achievements.unlocked" :key="item.id" :delay="200">
@@ -69,13 +71,6 @@ h3 small {
 
 .grow {
   flex: 1;
-}
-
-.link {
-  font-size: var(--oj-fs-meta);
-  font-weight: 400;
-  color: #18a058;
-  text-decoration: none;
 }
 
 .grid {

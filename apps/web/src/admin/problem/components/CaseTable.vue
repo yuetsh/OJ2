@@ -82,8 +82,8 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
           <pre class="cell" :class="{ stale: status(row) === 'running' }">{{
             clipped(row).text || (status(row) === 'running' ? '在跑……' : '（没有输出）')
           }}</pre>
-          <button v-if="clipped(row).rest" type="button" class="more" @click="toggle(row.key)">⋯ 还有 {{ clipped(row).rest }} 行</button>
-          <button v-else-if="expanded.has(row.key)" type="button" class="more" @click="toggle(row.key)">收起</button>
+          <n-button v-if="clipped(row).rest" size="tiny" @click="toggle(row.key)">⋯ 还有 {{ clipped(row).rest }} 行</n-button>
+          <n-button v-else-if="expanded.has(row.key)" size="tiny" @click="toggle(row.key)">收起</n-button>
           <div v-if="status(row) === 'changed'" class="was">
             变了 · 原来存的是
             <del>{{
@@ -189,19 +189,6 @@ const status = (row: CaseRow) => caseStatus(row, props.source)
   color: v-bind('theme.errorColor');
   border-color: v-bind('theme.errorColorSuppl');
   background-color: rgba(208, 48, 80, 0.06);
-}
-
-.more {
-  border: 0;
-  padding: 0;
-  background: none;
-  font: inherit;
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
-}
-
-.more:hover {
-  text-decoration: underline;
 }
 
 .was {

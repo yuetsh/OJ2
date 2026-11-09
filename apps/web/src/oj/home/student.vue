@@ -410,7 +410,9 @@ function contestTime(contest: Contest) {
               上次（{{ dateText(lastVisit!.previousLogin!) }}）还有 {{ visit.unsolved.length }} 道没做对：{{ visit.unsolved[0]!.problemDisplayId }}
               {{ visit.unsolved[0]!.title }}
             </span>
-            <router-link :to="`/problem/${visit.unsolved[0]!.problemDisplayId}`" class="go"> 接着做 › </router-link>
+            <router-link v-slot="{ href, navigate }" :to="`/problem/${visit.unsolved[0]!.problemDisplayId}`" custom>
+              <n-button size="tiny" tag="a" :href="href" class="go" @click="navigate">接着做</n-button>
+            </router-link>
           </div>
         </n-card>
 
@@ -470,7 +472,9 @@ function contestTime(contest: Contest) {
       <div class="column">
         <n-card title="最近提交" :bordered="false" class="card">
           <template #header-extra>
-            <router-link to="/submission?myself=1" class="more">全部</router-link>
+            <router-link v-slot="{ href, navigate }" to="/submission?myself=1" custom>
+              <n-button size="small" tag="a" :href="href" @click="navigate">全部</n-button>
+            </router-link>
           </template>
           <div v-for="row in submissions" :key="row.id" class="row clickable" @click="openSubmission(row)">
             <SubmissionResultTag :result="row.result" size="small" />
@@ -487,7 +491,9 @@ function contestTime(contest: Contest) {
         <!-- 比赛只在有进行中 / 快开始的时候出现（这学期一场都没办，原来常年一块空卡） -->
         <n-card v-if="contests.length" title="比赛" :bordered="false" class="card">
           <template #header-extra>
-            <router-link to="/contest" class="more">全部</router-link>
+            <router-link v-slot="{ href, navigate }" to="/contest" custom>
+              <n-button size="small" tag="a" :href="href" @click="navigate">全部</n-button>
+            </router-link>
           </template>
           <router-link v-for="contest in contests" :key="contest.id" :to="`/contest/${contest.id}`" class="row stacked">
             <n-flex align="center" :size="8" :wrap="false">
@@ -502,7 +508,9 @@ function contestTime(contest: Contest) {
 
         <n-card v-if="announcements.length" title="公告" :bordered="false" class="card">
           <template #header-extra>
-            <router-link to="/announcement" class="more">全部</router-link>
+            <router-link v-slot="{ href, navigate }" to="/announcement" custom>
+              <n-button size="small" tag="a" :href="href" @click="navigate">全部</n-button>
+            </router-link>
           </template>
           <router-link v-for="item in announcements" :key="item.id" :to="{ path: '/announcement', query: { id: item.id } }" class="row">
             <n-tag v-if="item.top" type="warning" size="small" :bordered="false">置顶</n-tag>
@@ -681,22 +689,13 @@ a.row:hover {
 
 .visit-foot .go {
   flex: none;
-  color: #18a058;
-  font-weight: 600;
-  text-decoration: none;
 }
 
-.more,
 .plain-link {
   color: #18a058;
   text-decoration: none;
 }
 
-.more {
-  font-size: var(--oj-fs-sec);
-}
-
-.more:hover,
 .plain-link:hover {
   text-decoration: underline;
 }

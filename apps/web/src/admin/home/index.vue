@@ -158,9 +158,9 @@ onUnmounted(stopRolling)
     <div class="tile">
       <span class="label">今天提交</span>
       <b>{{ info.todaySubmissionCount }} 次</b>
-      <button v-if="info.todaySystemErrorCount" type="button" class="link bad-note" @click="openSystemErrors">
-        系统错误 {{ info.todaySystemErrorCount }} 次 →
-      </button>
+      <n-button v-if="info.todaySystemErrorCount" size="small" type="error" ghost class="go" @click="openSystemErrors">
+        系统错误 {{ info.todaySystemErrorCount }} 次
+      </n-button>
       <span v-else class="note">系统错误 0 次</span>
     </div>
     <div class="tile">
@@ -171,7 +171,9 @@ onUnmounted(stopRolling)
     <div class="tile">
       <span class="label">正在上课</span>
       <b>{{ info.activeClass ? classLabel(info.activeClass) : '没有' }}</b>
-      <router-link v-if="info.activeClass" class="link" :to="{ name: 'task', query: { className: info.activeClass } }"> 去课堂任务 → </router-link>
+      <router-link v-if="info.activeClass" v-slot="{ href, navigate }" :to="{ name: 'task', query: { className: info.activeClass } }" custom>
+        <n-button size="small" tag="a" class="go" :href="href" @click="navigate">去课堂任务</n-button>
+      </router-link>
       <span v-else class="note">最近两小时没有哪个班在交题</span>
     </div>
   </div>
@@ -259,20 +261,8 @@ onUnmounted(stopRolling)
   font-size: 13px;
 }
 
-.link {
+.go {
   align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 13px;
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.link:hover {
-  text-decoration: underline;
 }
 
 .site {

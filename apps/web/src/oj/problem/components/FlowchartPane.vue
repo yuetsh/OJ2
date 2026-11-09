@@ -188,8 +188,8 @@ useBackClose(zoomOpen, isMobile)
         <span class="percent">{{ percent }}%</span>
         <button type="button" aria-label="放大" :disabled="scale >= STEPS[STEPS.length - 1]!" @click="zoomIn">+</button>
       </span>
-      <n-button text type="primary" @click="fitAll">看全图</n-button>
-      <n-button text type="primary" @click="zoomOpen = true">放大看 ›</n-button>
+      <n-button size="small" @click="fitAll">看全图</n-button>
+      <n-button size="small" @click="zoomOpen = true">放大看</n-button>
     </div>
     <div
       ref="viewport"

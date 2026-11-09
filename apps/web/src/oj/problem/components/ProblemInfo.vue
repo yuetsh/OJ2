@@ -176,8 +176,13 @@ function segmentWidth(value: number, total: number) {
         <template v-if="contestStore.contest"> 比赛 {{ parseTime(contestStore.contest.endTime, 'HH:mm') }} 结束。 </template>
         现在只看得到你自己的提交，别人几次做对、错在哪，结束后一起公布。
       </n-text>
-      <router-link v-if="!contestStore.rankHidden" :to="{ name: 'contest rank', params: { contestID: route.params.contestID } }" class="link">
-        去看比赛排名 ›
+      <router-link
+        v-if="!contestStore.rankHidden"
+        v-slot="{ href, navigate }"
+        :to="{ name: 'contest rank', params: { contestID: route.params.contestID } }"
+        custom
+      >
+        <n-button size="small" tag="a" :href="href" @click="navigate">去看比赛排名</n-button>
       </router-link>
     </div>
 
@@ -297,9 +302,12 @@ function segmentWidth(value: number, total: number) {
           </tbody>
         </table>
         <div class="foot">
-          <a v-if="hiddenClasses" href="#" class="link small" @click.prevent="allClasses = true"> 还有 {{ hiddenClasses }} 个班 › </a>
+          <n-button v-if="hiddenClasses" size="small" @click="allClasses = true">还有 {{ hiddenClasses }} 个班</n-button>
           <span class="spacer"></span>
-          <a href="#" class="link small" @click.prevent="openStatistics()"> 按人看谁没做对 <Icon icon="ph:arrow-square-out" :width="13" /> </a>
+          <n-button size="small" icon-placement="right" @click="openStatistics()">
+            <template #icon><Icon icon="ph:arrow-square-out" /></template>
+            按人看谁没做对
+          </n-button>
         </div>
       </div>
 
@@ -386,15 +394,6 @@ function segmentWidth(value: number, total: number) {
   background: v-bind('theme.actionColor');
   color: v-bind('theme.textColor2');
   margin-bottom: 4px;
-}
-
-.link {
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
 }
 
 .verdict {
@@ -532,6 +531,7 @@ function segmentWidth(value: number, total: number) {
 
 .foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
 }
 

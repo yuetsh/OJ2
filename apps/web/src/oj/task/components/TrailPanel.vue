@@ -102,8 +102,8 @@ const squares = computed(() =>
     </div>
 
     <div class="links">
-      <a v-if="item" :href="`/submission/${item.id}`" target="_blank">打开这次提交 ↗</a>
-      <a :href="listHref" target="_blank">在提交列表看这 {{ cell.trail.length }} 次 ↗</a>
+      <n-button v-if="item" size="small" tag="a" :href="`/submission/${item.id}`" target="_blank">打开这次提交</n-button>
+      <n-button size="small" tag="a" :href="listHref" target="_blank">在提交列表看这 {{ cell.trail.length }} 次</n-button>
     </div>
   </div>
 </template>
@@ -198,16 +198,9 @@ const squares = computed(() =>
 
 .links {
   display: flex;
-  gap: 18px;
-}
-
-.links a {
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-}
-
-.links a:hover {
-  text-decoration: underline;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .muted {

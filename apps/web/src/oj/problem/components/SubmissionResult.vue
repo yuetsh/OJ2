@@ -255,7 +255,7 @@ const customRunHint = computed(() => {
   // 先摊成纯文字：题面是 HTML，446 道题带着 style="color: rgb(51, 51, 51)"，直接取数会建议「拿 51 试试」
   const description = markdownToText(problem.description, Infinity)
   const numbers = [...new Set(description.match(/-?\d+(?:\.\d+)?/g) ?? [])].filter((value) => !inSamples.has(value)).slice(0, 2)
-  return numbers.length ? `去「自己输入」拿 ${numbers.join('、')} 这些数试试 ›` : '去「自己输入」拿特殊的数试试 ›'
+  return numbers.length ? `去「自己输入」拿 ${numbers.join('、')} 这些数试试` : '去「自己输入」拿特殊的数试试'
 })
 
 // 是否显示AI提示区域。
@@ -399,7 +399,7 @@ const columns: DataTableColumn<JudgeCaseResult>[] = [
           <template #icon><Icon icon="ph:sparkle-fill" /></template>
           让 AI 分析我的代码
         </n-button>
-        <n-button v-if="customRunHint" text type="primary" @click="submissionStore.revealResult('custom')">
+        <n-button v-if="customRunHint" @click="submissionStore.revealResult('custom')">
           {{ customRunHint }}
         </n-button>
       </div>

@@ -183,22 +183,29 @@ function threatNote(me: RankRow, behind: RankRow) {
         <b v-else class="none">没上榜</b>
       </button>
     </div>
-    <router-link to="/ai-analysis" class="analysis">
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
-      </svg>
-      看我的智能分析：每节课做得怎样、哪几道还差一点 ›
-    </router-link>
+    <div class="analysis">
+      <span class="analysis-text">每节课做得怎样、哪几道还差一点</span>
+      <router-link v-slot="{ href, navigate }" to="/ai-analysis" custom>
+        <n-button size="small" tag="a" :href="href" @click="navigate">
+          <template #icon>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" />
+            </svg>
+          </template>
+          看我的智能分析
+        </n-button>
+      </router-link>
+    </div>
   </div>
 </template>
 
@@ -407,17 +414,17 @@ function threatNote(me: RankRow, behind: RankRow) {
 
 .analysis {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 6px 10px;
   padding-top: 10px;
   border-top: 1px solid rgba(24, 160, 88, 0.3);
   font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
 }
 
-.analysis:hover {
-  text-decoration: underline;
+.analysis-text {
+  color: v-bind('theme.textColor2');
 }
 
 .minis {

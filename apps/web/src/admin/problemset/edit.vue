@@ -424,7 +424,7 @@ onMounted(load)
       <div v-if="current" class="stats">
         <span>{{ current.participantCount }} 人加入 · {{ current.completedCount }} 人做完</span>
         <div class="spacer"></div>
-        <a :href="`/problemset/${current.id}?tab=class`" target="_blank">看全班情况 ›</a>
+        <n-button size="small" tag="a" :href="`/problemset/${current.id}?tab=class`" target="_blank">看全班情况</n-button>
       </div>
 
       <div class="save">
@@ -434,7 +434,7 @@ onMounted(load)
           ><template v-if="editing"> · {{ badges.length }} 个奖章</template></span
         >
         <div class="spacer"></div>
-        <n-button v-if="editing" text type="error" @click="removeSet">删除专题</n-button>
+        <n-button v-if="editing" size="small" type="error" ghost @click="removeSet">删除专题</n-button>
       </div>
     </section>
 
@@ -462,7 +462,7 @@ onMounted(load)
             <span class="muted num">{{ row._id }}</span>
             <span class="ell grow">{{ row.title }}</span>
             <span v-if="added(row._id)" class="muted tiny">已加入</span>
-            <n-button v-else size="small" text type="primary" @click="addRow(row)">+ 加入</n-button>
+            <n-button v-else size="small" @click="addRow(row)">+ 加入</n-button>
           </div>
         </div>
 
@@ -511,7 +511,7 @@ onMounted(load)
             <span class="chip small static">{{ badgeCondition(badge) }}</span>
             <span class="muted ell grow tiny">{{ badge.description }}</span>
             <span class="muted num tiny">{{ badge.earnedCount }} 人拿到</span>
-            <n-button size="small" text type="primary" @click="openBadge(badge)">改</n-button>
+            <n-button size="small" @click="openBadge(badge)">改</n-button>
             <n-button size="small" text :aria-label="`删掉 ${badge.name}`" @click="removeBadge(badge)">✕</n-button>
           </div>
         </div>
@@ -670,16 +670,11 @@ onMounted(load)
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: 6px 8px 6px 12px;
   border: 1px solid v-bind('theme.borderColor');
   border-radius: 6px;
   font-size: 13px;
   background: v-bind('theme.actionColor');
-}
-
-.stats a {
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
 }
 
 .save {

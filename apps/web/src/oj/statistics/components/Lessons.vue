@@ -143,7 +143,10 @@ function percent(value: number, total: number) {
     <div v-if="liveLessons.length" class="live" :style="{ background: tone('success').background, color: tone('success').color }">
       <span>{{ liveLessons.map((item) => classLabel(item.className)).join('、') }}正在上课</span>
       <span class="spacer"></span>
-      <a href="#" class="live-link" @click.prevent="router.push('/task')"> <Icon icon="ph:monitor" :width="14" />去课堂任务 </a>
+      <n-button size="small" @click="router.push('/task')">
+        <template #icon><Icon icon="ph:monitor" /></template>
+        去课堂任务
+      </n-button>
     </div>
 
     <div v-if="!lessonCount && !data.scattered.length" class="empty">这段时间没有人交</div>
@@ -176,13 +179,10 @@ function percent(value: number, total: number) {
         <span class="c-go">看这节课<Icon icon="ph:caret-right-bold" :width="12" /></span>
       </a>
       <div v-if="group.scattered.length" class="scattered">
-        {{ group.lessons.length ? '另有零散提交：' : '零散提交：' }}
-        <template v-for="(item, index) in group.scattered" :key="item.className ?? ''">
-          <template v-if="index"> · </template>
-          <a href="#" title="看这个班这一天的提交" @click.prevent="emit('scattered', item)"
-            >{{ classLabel(item.className) }} {{ item.userCount }} 人 {{ item.total }} 次</a
-          >
-        </template>
+        <span>{{ group.lessons.length ? '另有零散提交' : '零散提交' }}</span>
+        <n-button v-for="item in group.scattered" :key="item.className ?? ''" size="tiny" title="看这个班这一天的提交" @click="emit('scattered', item)">
+          {{ classLabel(item.className) }} {{ item.userCount }} 人 {{ item.total }} 次
+        </n-button>
       </div>
     </template>
 
@@ -272,19 +272,8 @@ function percent(value: number, total: number) {
   display: flex;
   align-items: center;
   margin: 12px 20px 4px;
-  padding: 8px 14px;
+  padding: 6px 8px 6px 14px;
   border-radius: 8px;
-}
-
-/* 横幅本身就是绿的，字再绿也看不出能点，靠下划线 */
-.live-link {
-  color: inherit;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .spacer {
@@ -439,20 +428,14 @@ function percent(value: number, total: number) {
 }
 
 .scattered {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   padding: 8px var(--oj-pad-x);
   font-size: var(--oj-fs-meta);
   color: v-bind('theme.textColor3');
   border-bottom: 1px solid v-bind('theme.dividerColor');
-}
-
-.scattered a {
-  color: v-bind('theme.textColor2');
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
-}
-
-.scattered a:hover {
-  color: v-bind('theme.primaryColor');
 }
 
 .more {

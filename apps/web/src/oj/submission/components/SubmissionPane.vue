@@ -303,9 +303,9 @@ function openStandalone() {
       />
       <div v-else class="placeholder">
         <n-spin v-if="loading" size="small" />
-        <span v-else-if="failed" class="muted">
-          代码没拉下来，
-          <a href="#" @click.prevent="load">再试一次</a>
+        <span v-else-if="failed" class="muted reload">
+          代码没拉下来
+          <n-button size="small" @click="load">再试一次</n-button>
         </span>
       </div>
     </template>
@@ -569,6 +569,12 @@ function openStandalone() {
 
 .muted {
   color: v-bind('theme.textColor3');
+}
+
+.reload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .locked,
