@@ -1,4 +1,4 @@
-import { MASCOT_SPOKEN_KINDS, mascotEventSchema, type MascotJournal, type MascotProfile } from '@oj2/contract'
+import { MASCOT_FISH_SINCE, MASCOT_SPOKEN_KINDS, mascotEventSchema, type MascotJournal, type MascotProfile } from '@oj2/contract'
 import { and, count, countDistinct, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
@@ -6,7 +6,7 @@ import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
 import { parseBody, success } from '../http'
 import { JudgeStatus } from '../judge/status'
-import { calendarDay, dayNumber, dayStart, localTime, weekStart } from '../time'
+import { calendarDay, dayNumber, dayStart, localDateTime, localTime, weekStart } from '../time'
 
 export const mascotRoutes = new Hono<AppEnv>()
 
@@ -95,6 +95,26 @@ async function memoryOf(userId: number) {
   }
 }
 
+/** 小鱼干（契约 mascotProfileSchema.fish）：MASCOT_FISH_SINCE 以后第一次做对的题各一条，喂掉的按 feed 事件数 */
+async function fishOf(userId: number) {
+  const s = schema.submission
+  const e = schema.mascotEvent
+  const since = localDateTime(MASCOT_FISH_SINCE, '00:00')
+  const [row] = await db.execute<{ earned: number; fed: number }>(sql`
+    select
+      (
+        select count(*)::int from (
+          select ${s.problemId} from ${s}
+          where ${s.userId} = ${userId} and ${s.result} in (${JudgeStatus.ACCEPTED}, ${JudgeStatus.AST_CHECK_FAILED})
+          group by ${s.problemId}
+          having min(${s.createTime}) >= ${since}
+        ) first_solved
+      ) as earned,
+      (select count(*)::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'feed') as fed
+  `)
+  return { earned: row?.earned ?? 0, fed: row?.fed ?? 0 }
+}
+
 /** 最近多少次题库提交拿来看学生常犯哪类错 */
 const RECENT_SUBMISSIONS = 20
 
@@ -105,7 +125,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers] = await Promise.all([
+  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -150,6 +170,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
       .from(e)
       .where(and(eq(e.userId, userId), eq(e.kind, 'answer')))
       .orderBy(e.situation, desc(e.createdAt)),
+    fishOf(userId),
   ])
   const eventCount = (kind: string) => weekEvents.find((row) => row.kind === kind)?.value ?? 0
 
@@ -164,6 +185,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
     memory,
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
+    fish,
     answers: Object.fromEntries(answers.filter((row) => row.situation?.startsWith('ask.') && row.action).map((row) => [row.situation!.slice(4), row.action!])),
     week: {
       submits: weekSubmits[0]?.value ?? 0,
@@ -187,7 +209,7 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
   const userId = c.get('user')!.id
   const e = schema.mascotEvent
   // 「碰她」只算对她做的事，跑例子、举手不算
-  const touched = inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer'])
+  const touched = inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed'])
   const mine = eq(e.userId, userId)
   const hour = sql<number>`extract(hour from ${localTime(e.createdAt)})::int`
   const page = sql<string>`split_part(${e.path}, '/', 2)`
@@ -204,11 +226,12 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
         peeks: sql<number>`(count(*) filter (where ${e.kind} = 'move' and ${e.line} like 'peek %'))::int`,
         flings: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'fling'))::int`,
         shakes: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'shake'))::int`,
+        feeds: sql<number>`(count(*) filter (where ${e.kind} = 'feed'))::int`,
         tickles: sql<number>`(count(*) filter (where ${e.kind} = 'play' and ${e.action} = 'tickle'))::int`,
         spoken: sql<number>`(count(*) filter (where ${e.kind} = 'speak'))::int`,
       })
       .from(e)
-      .where(and(mine, inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'speak']))),
+      .where(and(mine, inArray(e.kind, ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'speak']))),
     db.select({ hour, value: count() }).from(e).where(and(mine, touched)).groupBy(hour),
     db.select({ page, value: count() }).from(e).where(and(mine, touched)).groupBy(page).orderBy(desc(count())).limit(1),
     db

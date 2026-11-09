@@ -47,7 +47,7 @@ const HARD_RATE = 0.3
 const EASY_RATE = 0.7
 
 /** 几种「换个说法」各自的机会：不是每次都说同一件事 */
-const CHANCE = { classMany: 0.3, classFew: 0.5, rate: 0.4, hint: 0.5, challenge: 0.4 } as const
+const CHANCE = { classMany: 0.3, classFew: 0.5, rate: 0.4, hint: 0.5, challenge: 0.4, fish: 0.6 } as const
 const roll = (chance: number) => Math.random() < chance
 
 const FINISHED = (result: number | undefined) =>
@@ -59,6 +59,7 @@ const FINISHED = (result: number | undefined) =>
  *
  * 另外几件事她会主动开口（只对学生，频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
  * 没跑例子就交还错了、又犯了自己的老毛病（behavior.ts 的 habitSituation）、15 分钟没交没跑。
+ * 做对了也说（priority：不受频率上限管，等点评弹框关了再说）；第一次做对的题攒了一条小鱼干，多半说这个。
  *
  * `showResult` 是「我错在哪」：把左栏切到「结果」页签的那一段（提交结果 / 运行例子），页签归页面管。
  */
@@ -197,6 +198,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   let sampledSinceSubmit = false
   /** 上一次「动静」（进题、交、跑例子）的时刻，给「盯了好久」用 */
   let lastActivity = Date.now()
+  /** 交这一次之前这道题做对过没有：没做对过的，这次做对就攒了一条小鱼干 */
+  let solvedBeforeSubmit = false
 
   watch(
     () => problemStore.problem?.id,
@@ -237,6 +240,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       unsampledSubmits = sampledSinceSubmit ? 0 : unsampledSubmits + 1
       sampledSinceSubmit = false
       lastActivity = Date.now()
+      solvedBeforeSubmit = problemStore.problem?.myStatus === SubmissionStatus.accepted
     },
   )
 
@@ -247,6 +251,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       const problem = problemStore.problem
       if (!id || !FINISHED(result) || !problem || !student()) return
       refreshMascotProfile(true)
+      if (result === SubmissionStatus.accepted) {
+        requestSpeech({ key: `ac:${problem.id}`, situation: acceptedSituation(problem._id), priority: true })
+        return
+      }
       const failed = RESULT_SITUATION[result as SubmissionStatus]
       if (!failed) return
       const { runSamples, help, why } = studentActions(problem)
@@ -260,6 +268,15 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       }
     },
   )
+
+  /** 做对了说哪一组：新攒了小鱼干的多半说这个，不然看是不是全班第一个、一次就过、磨了好几次 */
+  function acceptedSituation(problemId: string): MascotSituation {
+    if (!solvedBeforeSubmit && roll(CHANCE.fish)) return 'problem.acceptedFish'
+    const lesson = lessonStore.find(problemId)
+    if (lesson && lesson.acceptedCount <= (lesson.myStatus === 'accepted' ? 1 : 0)) return 'class.firstSolver'
+    const fails = problemStore.failCount
+    return fails === 0 ? 'problem.firstTry' : fails >= FINALLY_FAILS ? 'problem.finally' : 'problem.accepted'
+  }
 
   // 盯着一道没做对的题 15 分钟，没交也没跑：问一句
   useIntervalFn(() => {

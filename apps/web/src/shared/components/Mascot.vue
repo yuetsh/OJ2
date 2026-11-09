@@ -17,6 +17,9 @@
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
  * - 闲聊：对学生，没人理她时隔 CHAT_GAP_* 自己说一句（说什么见 shared/mascot/chat.ts），会问同学问题、
  *   带按钮回答。正在敲键盘、刚冒过气泡、比赛里都不说；睡着了说梦话，不醒。
+ * - 小鱼干：学生做对新题攒（behavior.ts 的 fishLeft），脚边一个小牌子写着几条，拖到她身上就喂了，
+ *   两分钟喂到 FULL_AFTER 条就饱了、一会儿再喂；生闷气时喂一条就哄好了，睡着了喂醒。
+ * - 做对了（题目页发来 priority 的话）：马上换高兴的图，等点评弹框关了再说，不受主动开口的频率上限管。
  * - 摆弄：拖着一甩松手会飞出去，撞边回弹、落到底边晕一会儿；拎着来回摇会被摇晕；鼠标不按键在她身上
  *   来回蹭是挠痒；藏在屏幕边上被点到，说「被发现了」。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
@@ -44,7 +47,10 @@ import {
   notePoke,
   personalize,
   refreshMascotProfile,
+  fishLeft,
+  noteFed,
   speechRequest,
+  type MascotSpeech,
 } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
@@ -107,6 +113,17 @@ const TICKLE_MS = 1600
 const TICKLE_COOLDOWN_MS = 8000
 // 藏在边上被点到，有这么大的机会说「被发现了」（不然照常说页面的事）
 const PEEK_FOUND_CHANCE = 0.6
+// 小鱼干：这么短时间里喂到这么多条就饱了，饱这么久
+const FULL_AFTER = 5
+const FULL_WINDOW_MS = 2 * 60_000
+const FULL_MS = 10 * 60_000
+// 拿着小鱼干凑到离她头这么近，她就眼巴巴地看着
+const FISH_NEAR_PX = 160
+// 做对了：高兴的图摆这么久；要说的话最多等弹框这么久，等不到就不说了
+// 点评弹框在烟花开始 1.5 秒后弹（还要先查一次评过没有），所以至少等这么久再看有没有弹框，不然话说在弹框前头
+const CHEER_MS = 2500
+const PRIORITY_MIN_DELAY_MS = 2500
+const PRIORITY_WAIT_MS = 90_000
 
 type HAnchor = 'left' | 'right' | null
 type VAnchor = 'top' | 'bottom' | null
@@ -159,6 +176,11 @@ const sulking = ref(false)
 const body = ref<HTMLElement>()
 const squashEl = ref<HTMLElement>()
 const bubbleEl = ref<HTMLElement>()
+/**
+ * 她整个人（连脚边的小鱼干牌子）：点在这里面都不算「点了别处」。从牌子上按下、在她身上松开，
+ * 浏览器把这一下 click 算在两者共同的外层上，只忽略 body 的话刚冒的气泡会被立刻收掉
+ */
+const rootEl = ref<HTMLElement>()
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(Math.max(v, lo), Math.max(lo, hi))
@@ -670,6 +692,7 @@ async function runAction(action: MascotAction) {
 let lastSpokeAt = -Infinity
 const spokenKeys = new Set<string>()
 watch(speechRequest, (speech) => {
+  if (speech?.priority) return speakSoon(speech)
   if (!speech || silent.value || sulking.value || dragging.value || bubble.value) return
   if (document.visibilityState !== 'visible' || spokenKeys.has(speech.key)) return
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
@@ -680,6 +703,119 @@ watch(speechRequest, (speech) => {
   say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
   logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
 })
+
+/** 做对了这类：马上换高兴的图，话等弹框（点评）关了、没在拖她再说。换了页面也照说 */
+const cheering = ref(false)
+let cheerTimer: ReturnType<typeof setTimeout> | undefined
+let priorityTimer: ReturnType<typeof setInterval> | undefined
+function speakSoon(speech: MascotSpeech) {
+  if (spokenKeys.has(speech.key)) return
+  spokenKeys.add(speech.key)
+  napping.value = false
+  touched()
+  cheering.value = true
+  clearTimeout(cheerTimer)
+  cheerTimer = setTimeout(() => (cheering.value = false), CHEER_MS)
+  const since = performance.now()
+  clearInterval(priorityTimer)
+  priorityTimer = setInterval(() => {
+    const waited = performance.now() - since
+    if (waited > PRIORITY_WAIT_MS) return clearInterval(priorityTimer)
+    if (waited < PRIORITY_MIN_DELAY_MS || document.querySelector('.n-modal-mask') || dragging.value || flying.value || document.visibilityState !== 'visible')
+      return
+    clearInterval(priorityTimer)
+    if (silent.value) return
+    const text = fillLine(pick(speech.situation), speech)
+    say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
+    logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
+  }, 400)
+}
+
+// ---- 小鱼干 ----
+const isStudent = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbove)
+/** 正拿着一条小鱼干往她那儿拖：指针在视口里的位置 */
+const fishDrag = ref<{ x: number; y: number } | null>(null)
+let fishStart = { x: 0, y: 0 }
+const fishNear = ref(false)
+const showFish = computed(() => isStudent.value && !silent.value && !peek.value && !dragging.value && !flying.value && fishLeft.value > 0)
+/** 多了一条时牌子蹦一下 */
+const fishBump = ref(false)
+watch(fishLeft, (now, before) => {
+  if (now <= before) return
+  fishBump.value = false
+  requestAnimationFrame(() => (fishBump.value = true))
+})
+let feedTimes: number[] = []
+let fullUntil = 0
+/** 嚼着：跟摸头一样一下一下地动 */
+const munching = ref(false)
+let munchTimer: ReturnType<typeof setTimeout> | undefined
+
+function onFishDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  // 别 stopPropagation：onClickOutside 在 window 上听 pointerdown 判断这一下要不要忽略，拦了它就把气泡收了
+  e.preventDefault()
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  fishStart = { x: e.clientX, y: e.clientY }
+  fishDrag.value = { x: e.clientX, y: e.clientY }
+}
+
+function onFishMove(e: PointerEvent) {
+  if (!fishDrag.value) return
+  fishDrag.value = { x: e.clientX, y: e.clientY }
+  const dx = e.clientX - (pos.x + WIDTH / 2)
+  const dy = e.clientY - (pos.y + HEIGHT * 0.35)
+  fishNear.value = Math.hypot(dx, dy) < FISH_NEAR_PX
+}
+
+function onFishUp(e: PointerEvent) {
+  if (!fishDrag.value) return
+  fishDrag.value = null
+  fishNear.value = false
+  const moved = Math.hypot(e.clientX - fishStart.x, e.clientY - fishStart.y)
+  // 只点了一下，没拖：她嫌你光看不给
+  if (moved < 4) {
+    const text = pick('feed.tease')
+    say({ text, pose: situationPose('feed.tease'), situation: 'feed.tease' })
+    logMascotEvent({ kind: 'open', situation: 'feed.tease', line: text })
+    return
+  }
+  const pad = 20
+  const inside = e.clientX > pos.x - pad && e.clientX < pos.x + WIDTH + pad && e.clientY > pos.y - pad && e.clientY < pos.y + HEIGHT + pad
+  if (inside) feed()
+}
+
+/** 喂一条：饱了就不吃（鱼不扣）；生着闷气就哄好了；睡着就喂醒了 */
+function feed() {
+  const now = performance.now()
+  touched()
+  if (now < fullUntil) {
+    const text = pick('feed.full')
+    say({ text, pose: situationPose('feed.full'), situation: 'feed.full' })
+    logMascotEvent({ kind: 'open', situation: 'feed.full', line: text })
+    return
+  }
+  noteFed()
+  let situation: 'feed' | 'feed.forgive' | 'feed.wake' = 'feed'
+  if (sulking.value) {
+    endSulk()
+    situation = 'feed.forgive'
+  } else if (napping.value) {
+    napping.value = false
+    situation = 'feed.wake'
+  }
+  feedTimes = [...feedTimes.filter((t) => now - t < FULL_WINDOW_MS), now]
+  if (feedTimes.length >= FULL_AFTER) {
+    fullUntil = now + FULL_MS
+    feedTimes = []
+  }
+  const text = pick(situation)
+  say({ text, pose: situationPose(situation), situation })
+  logMascotEvent({ kind: 'feed', situation, line: text })
+  munching.value = true
+  clearTimeout(munchTimer)
+  munchTimer = setTimeout(() => (munching.value = false), 1200)
+}
 
 // ---- 闲聊：没人理她，隔几分钟自己说一句（只对学生）----
 let nextChatAt = performance.now() + CHAT_FIRST_MS
@@ -747,8 +883,8 @@ watch(
   { immediate: true },
 )
 
-// 点别处收起；点她自己由 onUp 管（开关），不算「别处」
-onClickOutside(bubbleEl, close, { ignore: [body] })
+// 点别处收起；点她自己由 onUp 管（开关），点小鱼干由 onFishUp 管，都不算「别处」
+onClickOutside(bubbleEl, close, { ignore: [rootEl] })
 watch(() => route.fullPath, close)
 watch(silent, (quiet) => quiet && close())
 
@@ -773,6 +909,8 @@ const pose = computed<MascotPose>(() => {
   if (dragging.value) return shaken.value ? 'dizzy' : grabbedTail.value ? 'tail-grabbed' : 'lifted'
   if (patting.value) return giggling.value ? 'giggle' : 'patted'
   if (tickled.value) return 'giggle'
+  if (cheering.value && !bubble.value) return 'cheer'
+  if (fishNear.value) return 'excited'
   if (bubble.value?.pose) return bubble.value.pose
   if (sulking.value) return 'fuming'
   return idlePose.value ?? restPose
@@ -858,12 +996,16 @@ onBeforeUnmount(() => {
   clearTimeout(quietTimer)
   clearTimeout(sulkTimer)
   clearTimeout(tickleTimer)
+  clearTimeout(cheerTimer)
+  clearTimeout(munchTimer)
+  clearInterval(priorityTimer)
   cancelAnimationFrame(flyFrame)
 })
 </script>
 
 <template>
   <div
+    ref="rootEl"
     class="mascot"
     :class="{ dragging: dragging || flying }"
     :style="{ width: `${size.width}px`, height: `${size.height}px`, transform: `translate3d(${pos.x}px, ${pos.y}px, 0)` }"
@@ -871,7 +1013,7 @@ onBeforeUnmount(() => {
     <div
       ref="body"
       class="body"
-      :class="{ pressed, patting: patting || tickled, flipped: !peek && flipped !== sulking }"
+      :class="{ pressed, patting: patting || tickled || munching, flipped: !peek && flipped !== sulking }"
       aria-hidden="true"
       @pointerdown="onDown"
       @pointermove="onMove"
@@ -888,6 +1030,38 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    <div
+      v-if="showFish"
+      class="fish"
+      :class="{ left: !flipped, bump: fishBump, holding: !!fishDrag }"
+      @pointerdown="onFishDown"
+      @pointermove="onFishMove"
+      @pointerup="onFishUp"
+      @pointercancel="onFishUp"
+      @animationend="fishBump = false"
+      @dragstart.prevent
+    >
+      <svg class="fish-icon" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>
+      <span>{{ fishLeft }}</span>
+    </div>
+    <Teleport to="body">
+      <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <symbol id="oj-mascot-fish" viewBox="0 0 32 18">
+          <path d="M3 9c4-6 13-7 19-3l6-5v16l-6-5c-6 4-15 3-19-3z" fill="#d79a52" stroke="#7a4b22" stroke-width="1.5" stroke-linejoin="round" />
+          <path d="M14 5.5v7M17.5 5v8" stroke="#7a4b22" stroke-width="1.2" stroke-linecap="round" opacity="0.6" />
+          <circle cx="7.5" cy="8" r="1.4" fill="#3b2412" />
+        </symbol>
+      </svg>
+      <svg
+        v-if="fishDrag"
+        class="fish-flying"
+        viewBox="0 0 32 18"
+        :style="{ transform: `translate3d(${fishDrag.x - 20}px, ${fishDrag.y - 11}px, 0)` }"
+        aria-hidden="true"
+      >
+        <use href="#oj-mascot-fish" />
+      </svg>
+    </Teleport>
     <Transition name="bubble">
       <div
         v-if="bubble && !dragging && !flying"
@@ -1088,6 +1262,70 @@ img {
     animation: none;
   }
 }
+/* 脚边的小鱼干牌子：在她朝着页面中间的那一侧（她在右半边就放左边） */
+.fish {
+  position: absolute;
+  bottom: 14px;
+  left: calc(100% - 6px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 6px;
+  border: 2px solid #2b3a6b;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(20, 30, 60, 0.16);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: #2b3a6b;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.fish.left {
+  left: auto;
+  right: calc(100% - 6px);
+}
+html.dark .fish {
+  border-color: #7f94d4;
+  background: #1f2230;
+  color: #c9d3f2;
+}
+.fish.holding {
+  cursor: grabbing;
+}
+.fish.holding .fish-icon {
+  opacity: 0.3;
+}
+.fish.bump {
+  animation: mascot-fish-bump 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.fish-icon {
+  width: 26px;
+  height: 15px;
+}
+.fish-flying {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 901;
+  width: 40px;
+  height: 22px;
+  pointer-events: none;
+}
+@keyframes mascot-fish-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @media print {
   .mascot {
     display: none;

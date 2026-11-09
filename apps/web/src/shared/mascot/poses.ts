@@ -262,6 +262,13 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'play.fling': ['dizzy'],
   'play.shake': ['dizzy'],
   'play.tickle': ['giggle'],
+  // 小鱼干
+  feed: ['eat', 'snack', 'happy', 'heart'],
+  'feed.full': ['melt', 'sleepy'],
+  'feed.forgive': ['blush', 'touched'],
+  'feed.wake': ['stretch'],
+  'feed.tease': ['teasing', 'waiting'],
+  'problem.acceptedFish': ['happy', 'cheer', 'excited'],
 }
 
 /** 老毛病那几组（habit.NameError …）没一一列，统一是不耐烦的那张 */

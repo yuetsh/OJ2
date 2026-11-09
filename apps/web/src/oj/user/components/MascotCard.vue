@@ -2,7 +2,7 @@
 import { TIME_ZONE_OFFSET_MINUTES, type MascotJournal } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { getMascotJournal } from 'oj/api'
-import { mascotProfile } from 'shared/mascot/behavior'
+import { fishLeft, mascotProfile } from 'shared/mascot/behavior'
 import { MASCOT_QUESTIONS } from 'shared/mascot/chat'
 import { buildCollection } from 'shared/mascot/collection'
 import { parseTime } from 'utils/functions'
@@ -45,6 +45,7 @@ const tiles = computed(() => {
     { label: '甩出去', value: c.flings },
     { label: '拎着摇晕', value: c.shakes },
     { label: '挠痒', value: c.tickles },
+    { label: '喂小鱼干', value: c.feeds },
   ]
 })
 
@@ -124,7 +125,11 @@ const latestLine = computed(() => journal.value?.lines[0] ?? null)
 
     <n-modal v-model:show="open" preset="card" title="和小鲸鱼的相处记录" class="mascot-journal" :style="modalStyle">
       <div class="journal">
-        <p class="since">{{ parseTime(journal.firstAt, 'YYYY年M月D日') }}认识，来找过她 {{ journal.days }} 天</p>
+        <p class="since">
+          {{ parseTime(journal.firstAt, 'YYYY年M月D日') }}认识，来找过她 {{ journal.days }} 天<template v-if="mascotProfile"
+            >，手里还有 {{ fishLeft }} 条小鱼干</template
+          >
+        </p>
 
         <div class="tiles">
           <div v-for="tile in tiles" :key="tile.label" class="tile" :class="{ zero: !tile.value }">
@@ -278,7 +283,7 @@ h4 {
 
 .tiles {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 

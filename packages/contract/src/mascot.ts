@@ -11,18 +11,19 @@ import { z } from 'zod'
  * - `move`：被拖到了别处（line 记落点贴的边，比如 `right bottom`）
  * - `play`：被摆弄（action 记 `fling` 甩出去 / `shake` 拎着摇晕 / `tickle` 鼠标蹭着挠痒，line 是她说的那句）
  * - `answer`：回答了她闲聊时问的问题（situation = `ask.<题>`，action = 选的那一项的键，line 是她接的那句）
+ * - `feed`：喂了她一条小鱼干（line 是她说的那句）。小鱼干做对新题攒，喂一条记一条，剩几条按这个算（见 mascotProfileSchema.fish）
  *
  * 另外两种不是对她做的，是她要看的行为，别处没有存：
  * - `trial`：在题目页运行了例子 / 自己输入（action 记 `samples` / `custom`）
  * - `help`：在题目页举了手
  *
- * `open` / `speak` / `pat` / `overclick` / `play` 的 line 合起来就是她对这个学生说过的话（GET /mascot/journal，主页的台词收集）。
+ * `open` / `speak` / `pat` / `overclick` / `play` / `feed` 的 line 合起来就是她对这个学生说过的话（GET /mascot/journal，主页的台词收集）。
  *
  * 不记代码、不记按键。
  */
-export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'play', 'answer', 'trial', 'help'] as const
+export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'trial', 'help'] as const
 /** 这几种的 line 是她说出口的话，算进台词收集 */
-export const MASCOT_SPOKEN_KINDS = ['open', 'speak', 'pat', 'overclick', 'play'] as const satisfies readonly (typeof MASCOT_EVENT_KINDS)[number][]
+export const MASCOT_SPOKEN_KINDS = ['open', 'speak', 'pat', 'overclick', 'play', 'feed'] as const satisfies readonly (typeof MASCOT_EVENT_KINDS)[number][]
 export const mascotEventKindSchema = z.enum(MASCOT_EVENT_KINDS)
 export type MascotEventKind = z.infer<typeof mascotEventKindSchema>
 
@@ -35,6 +36,11 @@ export const mascotEventSchema = z.object({
   path: z.string().max(200),
 })
 export type MascotEventInput = z.infer<typeof mascotEventSchema>
+
+/** 小鱼干上线时每人先送几条：没做新题也能先喂着试试 */
+export const MASCOT_FISH_GIFT = 3
+/** 从这一天（东八区）起第一次做对的题才攒小鱼干，以前做对的不算 */
+export const MASCOT_FISH_SINCE = '2026-11-09'
 
 /**
  * 看板娘按学生的行为挑话用的（GET /mascot/profile）。只给学生自己的，进页面时拉一次。
@@ -74,6 +80,14 @@ export const mascotProfileSchema = z.object({
     solvedBeforeToday: z.number().int(),
     /** 今天说过「熟了一点」（memory.closer）没有 */
     closerSaidToday: z.boolean(),
+  }),
+  /**
+   * 小鱼干：上线时每人先送 MASCOT_FISH_GIFT 条，之后每做对一道**新**题（第一次做对的时刻在 MASCOT_FISH_SINCE 之后，
+   * 含比赛题）攒一条。剩几条 = 送的 + earned - fed，前台算
+   */
+  fish: z.object({
+    earned: z.number().int(),
+    fed: z.number().int(),
   }),
   /** 闲聊时问过的问题，每题最后一次选的是哪一项（`ask.<题>` 去掉前缀 → 选项的键） */
   answers: z.record(z.string(), z.string()),
@@ -117,6 +131,8 @@ export const mascotJournalSchema = z.object({
     flings: z.number().int(),
     /** 拎着摇晕 */
     shakes: z.number().int(),
+    /** 喂小鱼干 */
+    feeds: z.number().int(),
     /** 挠痒 */
     tickles: z.number().int(),
     /** 她主动跟你说话 */

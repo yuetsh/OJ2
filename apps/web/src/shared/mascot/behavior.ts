@@ -1,4 +1,4 @@
-import type { MascotEventInput, MascotProfile } from '@oj2/contract'
+import { MASCOT_FISH_GIFT, type MascotEventInput, type MascotProfile } from '@oj2/contract'
 import api from 'utils/api'
 import { useUserStore } from 'shared/store/user'
 import type { MascotGuide } from './guide'
@@ -36,6 +36,12 @@ export function refreshMascotProfile(force = false) {
   loading = api
     .get<MascotProfile>('mascot/profile')
     .then((profile) => {
+      const userId = userStore.user?.id ?? null
+      if (userId !== fishUserId) {
+        fishUserId = userId
+        fishBase = profile.fish.fed
+        fedLocally.value = 0
+      }
       mascotProfile.value = profile
       loadedAt = Date.now()
     })
@@ -44,6 +50,27 @@ export function refreshMascotProfile(force = false) {
       loading = null
     })
   return loading
+}
+
+// ---- 小鱼干 ----
+
+/**
+ * 喂掉的数前台先记着：喂一条就发一条 feed 事件，不等它落库，接着拉回来的数可能还没算上刚喂的那条。
+ * 所以按「拉到这个人的第一份数时已喂的 + 这一页里喂的」和后端的数取大的，数字不会往回跳
+ */
+let fishUserId: number | null = null
+let fishBase = 0
+const fedLocally = ref(0)
+
+/** 手里还剩几条小鱼干（只对学生，没拉到数是 0） */
+export const fishLeft = computed(() => {
+  const fish = mascotProfile.value?.fish
+  if (!fish) return 0
+  return Math.max(0, MASCOT_FISH_GIFT + fish.earned - Math.max(fish.fed, fishBase + fedLocally.value))
+})
+
+export function noteFed() {
+  fedLocally.value++
 }
 
 /** 刚回答了她的问题：先记在手里的这份数上，不等下次拉（不然 30 秒内可能又问一遍） */
@@ -214,6 +241,11 @@ export function personalize(guide: MascotGuide): MascotGuide {
 export interface MascotSpeech extends MascotGuide {
   /** 同一个 key 一次页面会话里只说一次（比如「这道题卡住了」每道题只说一回） */
   key: string
+  /**
+   * 做对了这类要说的：不受主动开口的频率上限管，先换上高兴的图，等弹框（点评）关了再说，
+   * 跟着换了页面也照说
+   */
+  priority?: boolean
 }
 
 /** 页面请她主动说一句；说不说、什么时候说由 Mascot.vue 按频率上限定 */
