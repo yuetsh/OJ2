@@ -1,8 +1,8 @@
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { HINT_MIN_FAILURES, isFlowchartPass } from '@oj2/contract'
-import { habitSituation, logMascotEvent, refreshMascotProfile, requestSpeech } from 'shared/mascot/behavior'
-import { findChinesePunct, fixChinesePunct, type PunctIssue } from 'shared/mascot/punct'
+import { habitSituation, logMascotEvent, refreshMascotProfile, requestSpeech, spokenSpeechKeys } from 'shared/mascot/behavior'
+import { lintCode, type LintIssue, type LintRule } from '../utils/codeLint'
 import { useChallengeStore } from 'oj/store/challenge'
 import { useFlowchartStore } from 'oj/store/flowchart'
 import type { MascotSituation } from 'shared/mascot/lines'
@@ -33,8 +33,27 @@ const RESULT_SITUATION: Partial<Record<SubmissionStatus, MascotSituation>> = {
   [SubmissionStatus.real_time_limit_exceeded]: 'problem.timeout',
 }
 
-/** 停手这么久还有中文标点，她就说（再加上 Mascot.vue 那边至少等的 2.5 秒） */
-const PUNCT_PAUSE_MS = 2000
+/** 每条检查说哪组话。写成表而不是拼字符串：加了规则忘了写台词，这里编译不过 */
+const LINT_SITUATION: Record<Exclude<LintRule, 'punct'>, MascotSituation> = {
+  typo: 'lint.typo',
+  printf: 'lint.printf',
+  bareMethod: 'lint.bareMethod',
+  inputPrompt: 'lint.inputPrompt',
+  colon: 'lint.colon',
+  assignInIf: 'lint.assignInIf',
+  cOperator: 'lint.cOperator',
+  shadowBuiltin: 'lint.shadowBuiltin',
+  elseIf: 'lint.elseIf',
+  keywordCase: 'lint.keywordCase',
+  printStatement: 'lint.printStatement',
+  noInt: 'lint.noInt',
+  wrongLangC: 'lint.wrongLangC',
+  wrongLangPython: 'lint.wrongLangPython',
+  noInclude: 'lint.noInclude',
+}
+
+/** 停手这么久还有常见的错，她就说（再加上 Mascot.vue 那边至少等的 2.5 秒） */
+const LINT_PAUSE_MS = 2000
 
 /** 一道题上这么久没交、没跑例子，她就来问一句（主动开口） */
 const IDLE_MS = 15 * 60_000
@@ -64,8 +83,9 @@ const FINISHED = (result: number | undefined) =>
  * 另外几件事她会主动开口（只对学生，频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
  * 没跑例子就交还错了、又犯了自己的老毛病（behavior.ts 的 habitSituation）、15 分钟没交没跑。
  * 做对了也说（priority：不受频率上限管，等点评弹框关了再说）；第一次做对的题攒了一条小鱼干，多半说这个。
- * 代码里混进了中文标点（shared/mascot/punct.ts），停手 PUNCT_PAUSE_MS 以后她指出第几行，能一键换成英文的；
- * 点她的时候有中文标点也先说这个（多半就是编译不过的原因）。
+ * 代码里有常见的错（utils/codeLint.ts：中文标点、函数名拼错、input 带提示语、缺冒号……），停手 LINT_PAUSE_MS
+ * 以后她滑到那一行旁边指出来，改得了的给「帮我改」；光标所在那一行还在写，不说。一次只说最靠前的一处，
+ * 同一处只说一回。点她的时候有这类错也先说（多半就是交不过的原因）。
  *
  * `showResult` 是「我错在哪」：把左栏切到「结果」页签的那一段（提交结果 / 运行例子），页签归页面管。
  */
@@ -100,18 +120,25 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const submit: MascotAction | null = busy
       ? null
       : { label: '提交', run: () => submissionStore.submit({ contestId: entry.contestId, problemSetId: entry.problemSetId }) }
-    // 协作中（举手了、老师在帮）不替学生改代码：编辑器正和对方同步
-    const fixPunct: MascotAction | null =
-      collabStore.helpStatus === 'idle'
-        ? {
-            label: '帮我换掉',
-            run: () => {
-              const issues = findChinesePunct(codeStore.code.value, codeStore.code.language)
-              if (issues.length) codeStore.setCode(fixChinesePunct(codeStore.code.value, issues))
-            },
-          }
-        : null
-    return { runSamples, help, why, whySamples, submit, fixPunct }
+    return { runSamples, help, why, whySamples, submit }
+  }
+
+  /** 代码里现在还在的那几处错（按行排） */
+  const currentIssues = () => lintCode(codeStore.code.value, codeStore.code.language)
+
+  /**
+   * 「帮我改」：按 key 在**当下的**代码里重新找那一处再改（说话到点按钮之间学生可能又改过）。
+   * 协作中（举手了、老师在帮）不替学生改：编辑器正和对方同步
+   */
+  function fixAction(issue: LintIssue): MascotAction | null {
+    if (!issue.fix || collabStore.helpStatus !== 'idle') return null
+    return {
+      label: issue.rule === 'punct' ? '帮我换掉' : '帮我改',
+      run: () => {
+        const now = currentIssues().find((it) => it.key === issue.key)
+        if (now?.fix) codeStore.setCode(now.fix(codeStore.code.value))
+      },
+    }
   }
 
   /**
@@ -127,15 +154,18 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     return null
   }
 
-  /** 中文标点那句：一处说是什么、在第几行；好几处说一共几处、从第几行起 */
-  function punctGuide(issues: PunctIssue[], fix: MascotAction | null): MascotGuide {
-    const first = issues[0]!
-    return {
-      situation: issues.length > 1 ? 'problem.chinesePuncts' : 'problem.chinesePunct',
-      n: issues.length,
-      vars: { line: first.line, name: first.name, ch: first.ch },
-      actions: fix ? [fix] : [],
-    }
+  /** 光标所在的那一行（还在写），拿不到是 null */
+  function activeLine() {
+    const text = document.querySelector('.problem-editor .cm-lineNumbers .cm-activeLineGutter')?.textContent
+    return text ? Number(text) : null
+  }
+
+  /** 指出一处错的那句话：中文标点一处、好几处分两组；别的按规则 lint.* */
+  function lintGuide(issue: LintIssue): MascotGuide {
+    const situation: MascotSituation =
+      issue.rule === 'punct' ? (Number(issue.vars.n) > 1 ? 'problem.chinesePuncts' : 'problem.chinesePunct') : LINT_SITUATION[issue.rule]
+    const fix = fixAction(issue)
+    return { situation, n: Number(issue.vars.n ?? 1), vars: { line: issue.line, ...issue.vars }, actions: fix ? [fix] : [] }
   }
 
   const guide = (situation: MascotSituation, ...actions: (MascotAction | null)[]): MascotGuide => ({
@@ -170,8 +200,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     // 正在判、正在跑例子：没什么好说的，打个招呼
     if (submissionStore.judging || submissionStore.pending || submissionStore.trial.samplesRunning.value) return null
 
-    const punct = findChinesePunct(codeStore.code.value, codeStore.code.language)
-    if (punct.length) return punctGuide(punct, studentActions(problem).fixPunct)
+    const issue = currentIssues()[0]
+    if (issue) return lintGuide(issue)
 
     const stuck = problemStore.failCount >= STUCK_FAILS
     if (submissionStore.syntaxErrorInfo) return stuck ? guide('problem.stuck', help, why) : guide('problem.compileError', why, help)
@@ -322,25 +352,26 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     return fails === 0 ? 'problem.firstTry' : fails >= FINALLY_FAILS ? 'problem.finally' : 'problem.accepted'
   }
 
-  // 停手一会儿还有中文标点：指出来。同一处（第几行、哪个字）一次页面会话只说一回
+  // 停手一会儿还有常见的错：指出最靠前的那处。光标那行还在写，先不说；同一处一次页面会话只说一回
+  // （真说出口了才算，见 behavior.ts 的 spokenSpeechKeys）
   watchDebounced(
     () => [codeStore.code.value, codeStore.code.language] as const,
-    ([code, language]) => {
+    () => {
       const problem = problemStore.problem
       if (!problem || !student()) return
-      const issues = findChinesePunct(code, language)
-      const first = issues[0]
-      if (!first) return
-      const stillThere = () => findChinesePunct(codeStore.code.value, codeStore.code.language).some((it) => it.ch === first.ch && it.line === first.line)
+      const editing = activeLine()
+      const keyOf = (it: LintIssue) => `lint:${problem.id}:${it.key}`
+      const issue = currentIssues().find((it) => it.line !== editing && !spokenSpeechKeys.has(keyOf(it)))
+      if (!issue) return
       requestSpeech({
-        key: `punct:${problem.id}:${first.line}:${first.ch}`,
-        ...punctGuide(issues, studentActions(problem).fixPunct),
+        key: keyOf(issue),
+        ...lintGuide(issue),
         priority: true,
-        valid: stillThere,
-        anchorY: () => editorLineY(first.line),
+        valid: () => currentIssues().some((it) => it.key === issue.key),
+        anchorY: () => editorLineY(issue.line),
       })
     },
-    { debounce: PUNCT_PAUSE_MS },
+    { debounce: LINT_PAUSE_MS },
   )
 
   // 盯着一道没做对的题 15 分钟，没交也没跑：问一句

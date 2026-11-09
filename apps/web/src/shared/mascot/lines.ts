@@ -382,16 +382,34 @@ export const MASCOT_LINES = {
   // 闲聊时穿着换的衣服
   'chat.outfit': ['这身衣服是你给的，记着呢', '今天穿得怎么样', '别人问起来，我就说是你送的', '这身……还挺喜欢的'],
 
-  // ---- 中文标点（shared/mascot/punct.ts）：{line} 第几行，{name} 中文逗号之类，{ch} 那个字符 ----
+  // ---- 写代码时的常见错（oj/problem/utils/codeLint.ts），她滑到那一行旁边说。{line} 第几行 ----
+  // 中文标点：{name} 是「逗号」「左括号」这类名字。只说名字、不拿字形比（「，」和「,」在正文里看不出区别）
   'problem.chinesePunct': [
-    '第 {line} 行有个{name}「{ch}」',
-    '第 {line} 行，「{ch}」是{name}',
-    '「{ch}」？第 {line} 行，换成英文的',
-    '{name}混进来了，第 {line} 行',
-    '输入法没切回来吧，第 {line} 行「{ch}」',
+    '第 {line} 行的{name}是中文的',
+    '第 {line} 行，{name}要用英文的',
+    '输入法没切回来吧，第 {line} 行的{name}',
+    '中文{name}混进来了，第 {line} 行',
   ],
-  // 好几处
   'problem.chinesePuncts': ['{n} 处中文标点，第一处在第 {line} 行', '一共 {n} 个中文标点，从第 {line} 行开始', '中文输入法没关？{n} 处了'],
+  // 函数名拼错：{name} 写的，{right} 应该是
+  'lint.typo': ['第 {line} 行，{name} 拼错了吧，是 {right}', '{name}？是 {right} 才对，第 {line} 行', '第 {line} 行的 {name} 我不认识，你想写 {right}？'],
+  'lint.printf': ['第 {line} 行，Python 里是 print，不是 printf', 'printf 是 C 的，Python 写 print，第 {line} 行'],
+  // 单独写 split(…)、append(…)
+  'lint.bareMethod': ['第 {line} 行，{name}() 要跟在后面用，比如 s.{name}()', '{name} 不能单独用，第 {line} 行，要写成 变量.{name}()'],
+  'lint.inputPrompt': ['第 {line} 行，input 括号里的字也会被输出，判题就对不上了', 'input() 里别写提示，第 {line} 行', '题目没让你说「请输入」，第 {line} 行'],
+  // {word} 是 if、for、else 这些
+  'lint.colon': ['第 {line} 行的 {word} 后面少了冒号', '{word} 那行末尾要加冒号，第 {line} 行', '冒号呢？第 {line} 行'],
+  'lint.assignInIf': ['第 {line} 行，比较相等要写两个等号', '一个等号是赋值，第 {line} 行要写 =='],
+  // {op} 是 ++、&&、||、!，{right} 是 Python 里的写法
+  'lint.cOperator': ['第 {line} 行，Python 里没有 {op}，写 {right}', '{op} 是 C 的写法，第 {line} 行换成 {right}'],
+  'lint.shadowBuiltin': ['第 {line} 行把 {name} 当成变量了，后面就用不了 {name}() 了', '{name} 是拿来调用的，别给它赋值，第 {line} 行'],
+  'lint.elseIf': ['第 {line} 行，Python 里是 elif，不是 else if'],
+  'lint.keywordCase': ['第 {line} 行，{name} 要小写：{right}', '大小写不对，第 {line} 行是 {right}'],
+  'lint.printStatement': ['第 {line} 行，print 后面要加括号', 'print 要带括号，第 {line} 行'],
+  'lint.noInt': ['第 {line} 行的 {name} 还是文字，先用 int() 转成数再算', 'input() 拿到的是文字，{name} 要 int() 一下，第 {line} 行'],
+  'lint.wrongLangC': ['这是 C 语言的代码吧？编辑器上面选的是 Python', '语言选错了，这段是 C，编辑器上面换一下'],
+  'lint.wrongLangPython': ['这是 Python 的代码吧？编辑器上面选的是 C', '语言选错了，这段是 Python，编辑器上面换一下'],
+  'lint.noInclude': ['第一行少了 #include <stdio.h>', '用 printf 之前要 #include <stdio.h>'],
 } as const satisfies Record<string, readonly string[]>
 
 export type MascotSituation = keyof typeof MASCOT_LINES

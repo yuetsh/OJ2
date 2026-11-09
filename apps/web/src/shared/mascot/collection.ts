@@ -23,7 +23,7 @@ const prefix =
 const GROUPS: Group[] = [
   { name: '打招呼', test: prefix('greet', 'first', 'familiar', 'wake', 'home.back', 'notFound', 'offHours', 'time', 'day') },
   { name: '闲聊', test: prefix('chat') },
-  { name: '做题的时候', test: prefix('problem', 'class', 'habit', 'idle', 'gentle', 'flowchart', 'submission') },
+  { name: '做题的时候', test: prefix('problem', 'class', 'habit', 'idle', 'gentle', 'flowchart', 'submission', 'lint') },
   {
     name: '逛别的页面',
     test: prefix(

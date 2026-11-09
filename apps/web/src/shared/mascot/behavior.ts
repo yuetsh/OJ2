@@ -275,6 +275,12 @@ export interface MascotSpeech extends MascotGuide {
   anchorY?: () => number | null
 }
 
+/**
+ * 主动说过的话（MascotSpeech.key）：同一个 key 一次页面会话只说一回。**真说出口了才记**（Mascot.vue）——
+ * 等着开口的时候那处错已经改掉了、没说成的不算，下次再出现还会说。页面挑下一处要说的错时也看它
+ */
+export const spokenSpeechKeys = new Set<string>()
+
 /** 页面请她主动说一句；说不说、什么时候说由 Mascot.vue 按频率上限定 */
 export const speechRequest = shallowRef<MascotSpeech | null>(null)
 export function requestSpeech(speech: MascotSpeech) {

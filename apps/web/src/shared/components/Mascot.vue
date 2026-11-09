@@ -56,6 +56,7 @@ import {
   mascotOutfit,
   noteFed,
   speechRequest,
+  spokenSpeechKeys,
   type MascotSpeech,
 } from 'shared/mascot/behavior'
 import { useAuthModalStore } from 'shared/store/authModal'
@@ -771,14 +772,13 @@ async function runAction(action: MascotAction) {
 
 // ---- 主动开口：页面经 requestSpeech 请她说，这里卡频率 ----
 let lastSpokeAt = -Infinity
-const spokenKeys = new Set<string>()
 watch(speechRequest, (speech) => {
   if (speech?.priority) return speakSoon(speech)
   if (!speech || silent.value || sulking.value || dragging.value || bubble.value) return
-  if (document.visibilityState !== 'visible' || spokenKeys.has(speech.key)) return
+  if (document.visibilityState !== 'visible' || spokenSpeechKeys.has(speech.key)) return
   if (performance.now() - lastSpokeAt < SPEAK_GAP_MS) return
   lastSpokeAt = performance.now()
-  spokenKeys.add(speech.key)
+  spokenSpeechKeys.add(speech.key)
   napping.value = false
   const text = fillLine(pick(speech.situation), speech)
   say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
@@ -789,9 +789,11 @@ watch(speechRequest, (speech) => {
 const cheering = ref(false)
 let cheerTimer: ReturnType<typeof setTimeout> | undefined
 let priorityTimer: ReturnType<typeof setInterval> | undefined
+/** 正等着开口的那句（同一句别重复排队） */
+let pendingKey: string | null = null
 function speakSoon(speech: MascotSpeech) {
-  if (spokenKeys.has(speech.key)) return
-  spokenKeys.add(speech.key)
+  if (spokenSpeechKeys.has(speech.key) || pendingKey === speech.key) return
+  pendingKey = speech.key
   napping.value = false
   touched()
   if (speech.cheer) {
@@ -803,11 +805,17 @@ function speakSoon(speech: MascotSpeech) {
   clearInterval(priorityTimer)
   priorityTimer = setInterval(() => {
     const waited = performance.now() - since
-    if (waited > PRIORITY_WAIT_MS) return clearInterval(priorityTimer)
+    if (waited > PRIORITY_WAIT_MS) {
+      pendingKey = null
+      return clearInterval(priorityTimer)
+    }
     if (waited < PRIORITY_MIN_DELAY_MS || document.querySelector('.n-modal-mask') || dragging.value || flying.value || document.visibilityState !== 'visible')
       return
     clearInterval(priorityTimer)
+    pendingKey = null
+    // 等的时候已经改掉了：没说成，不记，下次再出现还会说
     if (silent.value || speech.valid?.() === false) return
+    spokenSpeechKeys.add(speech.key)
     const text = fillLine(pick(speech.situation), speech)
     say({ text, actions: speech.actions?.slice(0, 3), situation: speech.situation, pose: situationPose(speech.situation) }, SPOKEN_BUBBLE_MS)
     logMascotEvent({ kind: 'speak', situation: speech.situation, line: text })
