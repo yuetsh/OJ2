@@ -42,6 +42,13 @@ const ready = ref(!props.guard)
 const activeIndex = ref<number | null>(null)
 let loadSequence = 0
 
+/**
+ * 表情晚两帧再画、淡入：彩色表情（fluent-emoji）渐变多，画起来比整个轮盘还费事。和弹框挤在同一帧，
+ * 弹框出来那一下就顿一顿；先让弹框（连轮盘、文字）画出来，下一帧再画表情，位置事先占好、不跳
+ */
+const iconsShown = ref(false)
+onMounted(() => requestAnimationFrame(() => requestAnimationFrame(() => (iconsShown.value = true))))
+
 // ==================== 几何 ====================
 // viewBox 400 × 400，圆心 (200, 200)。标签是盖在 SVG 上的一层 HTML，按百分比定位
 const C = 200
@@ -313,7 +320,7 @@ function sectorAriaLabel(index: number) {
       >
         <span class="label-icon">
           <n-spin v-if="submitting === sector.key" :size="18" />
-          <Icon v-else :icon="sector.icon" />
+          <Icon v-else-if="iconsShown" :icon="sector.icon" class="label-emoji" />
         </span>
         <span class="label-text">{{ sector.label }}</span>
         <span v-if="results" class="label-count"> {{ mine === sector.key ? '✓ ' : '' }}{{ results.petals[sector.index]?.count ?? 0 }} 人 </span>
@@ -472,8 +479,30 @@ function sectorAriaLabel(index: number) {
 
 .label-icon {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 表情没出来（晚两帧画、还在取）时也占着这么大，文字不跳 */
+  width: 1em;
+  height: 1em;
   font-size: clamp(22px, 8cqi, 32px);
   line-height: 1;
+}
+
+.label-emoji {
+  animation: reaction-emoji-in 0.3s ease-out;
+}
+
+@keyframes reaction-emoji-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .label-emoji {
+    animation: none;
+  }
 }
 
 .label-text {
