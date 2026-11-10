@@ -14,6 +14,7 @@ import { classLabel } from 'utils/classes'
 import { submissionTimeText } from '../utils'
 import CodeView from './CodeView.vue'
 import ExplainNote from './ExplainNote.vue'
+import FilterButton from './FilterButton.vue'
 import StatusPill from './StatusPill.vue'
 import UserName from 'shared/components/UserName.vue'
 
@@ -172,40 +173,35 @@ function openStandalone() {
         <a class="user-link" :href="`/user?name=${encodeURIComponent(row.username)}`" target="_blank">
           <UserName :username="row.username" :muted="!!locked && locked !== 'problemset'" />
         </a>
-        <button class="filter-pill" title="只看这个人的提交" aria-label="只看这个人的提交" @click="emit('filterUser', row.username)">
-          <Icon icon="ph:funnel-simple-bold" :width="12" />
-        </button>
+        <FilterButton title="只看这个人的提交" :large="narrow" @click="emit('filterUser', row.username)" />
         <!-- 班级下拉只有网站配置里在读的班，摘掉的老班从这里筛。已经在筛这个班时原地变成「取消」，
              不用再挪到上面班级下拉去点 × -->
-        <button
+        <FilterButton
           v-if="teacher && !contest && row.className && row.className === className"
-          class="filter-pill wide active"
+          class="klass"
+          active
+          :label="classLabel(row.className)"
           :title="`不再只看${classLabel(row.className)}，看全部班级`"
-          :aria-label="`不再只看${classLabel(row.className)}，看全部班级`"
+          :large="narrow"
           @click="emit('clearClass')"
-        >
-          {{ classLabel(row.className) }}<Icon icon="ph:x-bold" :width="11" />
-        </button>
-        <button
+        />
+        <FilterButton
           v-else-if="teacher && !contest && row.className"
-          class="filter-pill wide"
+          class="klass"
+          :label="classLabel(row.className)"
           :title="`只看${classLabel(row.className)}的提交`"
-          :aria-label="`只看${classLabel(row.className)}的提交`"
+          :large="narrow"
           @click="emit('filterClass', row.className)"
-        >
-          {{ classLabel(row.className) }}<Icon icon="ph:funnel-simple-bold" :width="12" />
-        </button>
+        />
       </div>
-      <span v-if="!narrow" class="dot">·</span>
+      <span v-if="!narrow" class="dot"></span>
       <!-- 两层 display: contents 的壳：桌面上照旧排成一行，手机上题目整行另起、按钮挪到名字右边 -->
       <span class="problem-group">
         <a class="problem" href="#" :title="`${row.problemDisplayId} ${row.problemTitle}`" @click.prevent="emit('openProblem', row)">
           <span class="problem-id">{{ row.problemDisplayId }}</span>
           {{ row.problemTitle }}
         </a>
-        <button class="filter-pill" title="只看这道题的提交" aria-label="只看这道题的提交" @click="emit('filterProblem', row.problemDisplayId)">
-          <Icon icon="ph:funnel-simple-bold" :width="12" />
-        </button>
+        <FilterButton class="after-problem" title="只看这道题的提交" :large="narrow" @click="emit('filterProblem', row.problemDisplayId)" />
         <a
           v-if="row.problemSet"
           class="problemset"
@@ -412,18 +408,6 @@ function openStandalone() {
   gap: 8px;
 }
 
-/* 手指点的：漏斗按钮放大一圈 */
-.narrow .filter-pill {
-  width: 32px;
-  height: 28px;
-  border-radius: 14px;
-}
-
-.narrow .filter-pill.wide {
-  width: auto;
-  padding: 0 10px;
-}
-
 .narrow .code {
   flex: none;
 }
@@ -450,12 +434,17 @@ function openStandalone() {
 .who {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 
+/* 人和题目之间的一道竖线 */
 .dot {
-  color: v-bind('theme.textColor3');
+  flex: none;
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: v-bind('theme.dividerColor');
 }
 
 .problem {
@@ -487,44 +476,13 @@ function openStandalone() {
   background: v-bind("tone('info').background");
 }
 
-/* 只留漏斗图标（右栏六百来宽，带字的话名字、题目和按钮排不进一行），字在 title 里 */
-.filter-pill {
-  flex: none;
-  width: 24px;
-  height: 22px;
-  padding: 0;
-  justify-content: center;
-  border: 1px solid v-bind("tone('success').background");
-  border-radius: 11px;
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: v-bind("tone('success').color");
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
+/* 漏斗紧跟着它筛的那样东西；班级是另一样东西，隔开一点 */
+.klass {
+  margin-left: 10px;
 }
 
-.filter-pill.wide {
-  width: auto;
-  padding: 0 8px;
-  white-space: nowrap;
-}
-
-.filter-pill:hover {
-  background: v-bind("tone('success').background");
-}
-
-.filter-pill.active {
-  border-color: v-bind("tone('success').solid");
-  background: v-bind("tone('success').background");
-}
-
-.filter-pill.active:hover {
-  border-color: v-bind("tone('error').solid");
-  background: v-bind("tone('error').background");
-  color: v-bind("tone('error').color");
+.after-problem {
+  margin-left: -6px;
 }
 
 .spacer {
@@ -673,13 +631,6 @@ kbd {
   /* 先截班级，名字留全 */
   .pane:not(.narrow) .user-link {
     flex-shrink: 0;
-  }
-
-  .pane:not(.narrow) .filter-pill.wide {
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    justify-content: flex-start;
   }
 
   .pane:not(.narrow) .problem-group {

@@ -8,6 +8,7 @@ import type { FlowchartSubmission, FlowchartSubmissionListItem } from 'utils/typ
 import { FlowchartSubmissionStatus } from 'utils/types'
 import { useTone } from 'shared/composables/tone'
 import { submissionTimeText } from '../utils'
+import FilterButton from './FilterButton.vue'
 import FlowchartState from './FlowchartState.vue'
 import UserName from 'shared/components/UserName.vue'
 import FlowchartNote from 'shared/components/FlowchartNote.vue'
@@ -158,20 +159,16 @@ const canRetry = computed(
         <a class="user-link" :href="`/user?name=${encodeURIComponent(row.username)}`" target="_blank">
           <UserName :username="row.username" />
         </a>
-        <button class="filter-pill" title="只看这个人的提交" aria-label="只看这个人的提交" @click="emit('filterUser', row.username)">
-          <Icon icon="ph:funnel-simple-bold" :width="12" />
-        </button>
+        <FilterButton title="只看这个人的提交" :large="narrow" @click="emit('filterUser', row.username)" />
       </div>
-      <span v-if="!narrow" class="dot">·</span>
+      <span v-if="!narrow" class="dot"></span>
       <!-- display: contents 的壳：桌面上照旧一行，手机上题目整行另起 -->
       <span class="problem-group">
         <a class="problem" href="#" :title="`${row.problemDisplayId} ${row.problemTitle}`" @click.prevent="emit('openProblem', row)">
           <span class="problem-id">{{ row.problemDisplayId }}</span>
           {{ row.problemTitle }}
         </a>
-        <button class="filter-pill" title="只看这道题的提交" aria-label="只看这道题的提交" @click="emit('filterProblem', row.problemDisplayId)">
-          <Icon icon="ph:funnel-simple-bold" :width="12" />
-        </button>
+        <FilterButton class="after-problem" title="只看这道题的提交" :large="narrow" @click="emit('filterProblem', row.problemDisplayId)" />
       </span>
       <div class="spacer"></div>
       <!-- 右栏窄时这两个只剩图标（字在 title 里），把宽度让给题目名 -->
@@ -337,12 +334,6 @@ const canRetry = computed(
   white-space: normal;
 }
 
-.narrow .filter-pill {
-  width: 32px;
-  height: 28px;
-  border-radius: 14px;
-}
-
 .narrow .meta {
   flex-wrap: wrap;
   row-gap: 6px;
@@ -405,11 +396,19 @@ const canRetry = computed(
 .who {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 
-.dot,
+/* 人和题目之间的一道竖线 */
+.dot {
+  flex: none;
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: v-bind('theme.dividerColor');
+}
+
 .problem-id,
 .muted {
   color: v-bind('theme.textColor3');
@@ -432,23 +431,8 @@ const canRetry = computed(
   text-decoration: underline;
 }
 
-/* 只留漏斗图标（右栏六百来宽，带字的话名字、题目和按钮排不进一行），字在 title 里 */
-.filter-pill {
-  flex: none;
-  width: 24px;
-  height: 22px;
-  padding: 0;
-  justify-content: center;
-  border: 1px solid v-bind("tone('success').background");
-  border-radius: 11px;
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: v-bind("tone('success').color");
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
+.after-problem {
+  margin-left: -6px;
 }
 
 .spacer {
