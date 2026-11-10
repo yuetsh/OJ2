@@ -7,6 +7,9 @@
  *
  * `{n}` 由页面给的数字替换（还差几道、第几课、几个人举手）。
  * 文案守全站的规矩：全中文、不用「他」、对学生不说「追」。
+ *
+ * 老师和学生玩的是同一套（小鱼干、闲聊、指错、熟不熟 ……），听的也是这张表；只有口气不合适的那几组
+ * （叫「同学」的、催做题的、劝举手的）在文件末尾的 MASCOT_TEACHER_LINES 里另有一版，取台词一律走 mascotLines()。
  */
 export const MASCOT_LINES = {
   // ---- 学生：首页 ----
@@ -151,6 +154,21 @@ export const MASCOT_LINES = {
   'teacher.problems': ['又出新题？才没关心你', '出题辛苦了……随口说的', '题够多了吧', '新题记得放例子', '标签别忘了打'],
   'teacher.problemset': ['全班进度，记着呢', '谁没做完，一看就知道', '奖章发得出去吗'],
   'teacher.greet': ['老师好……才不是特意打招呼', '有事？', '忙完了？', '喝口水吧', '下课了吗', '今天几节课？', '辛苦……随口说的'],
+  // 老师这边的闲聊：顶掉学生那组编程冷知识（chat.ts）
+  'teacher.chat': [
+    '今天几节课',
+    '学生今天乖不乖',
+    '课备完了没',
+    '下课别拖堂',
+    '题别布置太多……我是说，适量',
+    '有学生举手我会喊你的',
+    '嗓子还好吗，多喝水',
+    '我帮你盯着学生呢……才怪',
+    '讲题讲慢点，后排跟不上',
+    '站一天了，坐会儿',
+    '今天有没有学生偷偷玩游戏',
+    '改题改到几点了',
+  ],
 
   // ---- 按学生的行为挑的（shared/mascot/behavior.ts）----
   // 最近 20 次提交里某类错特别多，再错这一类时换成这几句
@@ -426,3 +444,97 @@ export const MASCOT_LINES = {
 } as const satisfies Record<string, readonly string[]>
 
 export type MascotSituation = keyof typeof MASCOT_LINES
+
+/**
+ * 老师听到的另一版：只列口气对不上的那几组，整组顶掉学生的；没列的老师和学生听的是同一组。
+ * 学生那组里叫「同学」、催做题、拿上课下课说学生的，在这里换成对老师说的。
+ */
+export const MASCOT_TEACHER_LINES: Partial<Record<MascotSituation, readonly string[]>> = {
+  'first.meet': ['初次见面。……才不是特意等你', '你就是老师？', '第一次戳我？', '叫我小鲸鱼就行，别叫大肥鱼'],
+  overclick: ['老师，你够了', '再点我要生气了', '手不酸吗', '点我又不涨工资', '有这功夫备节课', '鼠标要坏了'],
+  'pester.mild': [
+    '又点？',
+    '刚说过了',
+    '还点？',
+    '你没别的事干吗',
+    '我很忙的',
+    '点一次就够了',
+    '听见了听见了',
+    '一直戳我干嘛',
+    '课备完了？',
+    '你在数我有几句话？',
+  ],
+  rare: ['服务器繁忙', '让我想想……算了', '这个我不会，骗你的', '刚才说到哪了', '我去吃饭了，下课告诉我'],
+  'time.firstClass': ['早，第一节有课吗', '早饭吃了没', '学生到齐了没', '眼睛睁开'],
+  'time.lunch': ['事已至此，先吃饭吧', '好饿', '饭点了', '下课就去吃'],
+  'time.afternoon': ['困了吧', '午觉睡了没', '下午第一节最难熬'],
+  'time.lastClass': ['快下课了，别拖堂', '最后一节了，撑住', '讲完这道就放学'],
+  'day.monday': ['周一了，打起精神', '这周几节课'],
+  'day.friday': ['周五了，再撑一天', '明天放假，今天少布置点'],
+  offHours: ['这个点还在忙？', '放假还来，行吧', '……有点感动，一点点'],
+  'affinity.1': ['最近来得挺勤啊', '又见面了', '题做得不少了嘛', '还算有点眼熟', '哼，又是你', '今天也有课？', '记住你了……才怪'],
+  'affinity.2': [
+    '你来了我就不无聊了……才怪',
+    '你讲题的样子，还挺认真',
+    '有不会的可以问我……虽然我也不会',
+    '今天也加油……随口说的',
+    '跟你说话不算浪费时间',
+    '别人戳我我才不理',
+    '题都自己做一遍？还挺负责',
+  ],
+  'affinity.3': [
+    '……你来得正好',
+    '累了就歇会儿',
+    '你上课，我放心',
+    '我才没有一直等你',
+    '跟你熟了，不怼你了……偶尔',
+    '今天也一起盯学生吧',
+    '学生不听话就告诉我……虽然我也没办法',
+  ],
+  'affinity.4': [
+    '……其实你挺厉害的',
+    '一百多道都做下来了，哼，服了',
+    '别告诉别人我夸过你',
+    '有你在，我挺安心的',
+    '我就知道是你',
+    '你是我最熟的老师……之一',
+    '学生碰上你这样的老师……运气不错',
+  ],
+  'chat.pose.gaming': ['这关好难', '别看，我在通关', '玩一会儿就去盯学生……才怪'],
+  'chat.pose.phone': ['刷一会儿手机', '别告诉学生', '群里又在聊什么'],
+}
+
+/** 这种情况说哪一组话：老师有另一版的用老师那版 */
+export function mascotLines(situation: MascotSituation, teacher: boolean): readonly string[] {
+  return (teacher && MASCOT_TEACHER_LINES[situation]) || MASCOT_LINES[situation]
+}
+
+/**
+ * 老师听不到的那几组（主页「听过的话」不算给老师）：学生首页和几个只对学生说话的页面、没写代码时题目页上的那几句
+ * （老师那时听的是 teacher.problem）、劝举手的、同班做对几个人（老师不在班里）。
+ * 写的是组名或者组名的前一截（`home` 管 `home.assigned`、`home.done` ……）
+ */
+export const MASCOT_STUDENT_ONLY = [
+  'greet',
+  'home',
+  'problems',
+  'problem.blank',
+  'problem.inSet',
+  'problem.unsubmitted',
+  'problem.solvedBefore',
+  'problem.stuck',
+  'problem.flowchart',
+  'idle',
+  'habit.neverHelp',
+  'class',
+  'submission',
+  'submissions',
+  'problemsets',
+  'problemset',
+  'learn',
+  'tutorial',
+  'rank',
+  'pk',
+  'contests',
+  'chat.trivia',
+] as const

@@ -107,7 +107,7 @@ export const MASCOT_OUTFIT_NONE = 'none'
 export const MASCOT_FISH_SINCE = '2026-11-09'
 
 /**
- * 看板娘按学生的行为挑话用的（GET /mascot/profile）。只给学生自己的，进页面时拉一次。
+ * 看板娘按人的行为挑话用的（GET /mascot/profile）。只给本人的（学生、老师都拉），进页面时拉一次。
  *
  * `recent` 是最近 20 次题库提交（不含比赛）里各类错误的次数；`runtimeErrorType` 是其中
  * 运行出错最多的那一种（NameError、TypeError …，C/C++ 没有这一项），没有就是 null。
@@ -243,7 +243,7 @@ export type MascotJournal = z.infer<typeof mascotJournalSchema>
 
 /**
  * 去同学主页串门时看到的（GET /mascot/of/:username）：对方的小鲸鱼今天穿着什么、认识多久、见过几个样子。
- * 只有这几样，互动次数、听过的话是对方自己的事，不给别人看。对方不是学生、从没碰过她，firstAt 是 null
+ * 只有这几样，互动次数、听过的话是对方自己的事，不给别人看。对方从没碰过她，firstAt 是 null
  */
 export const mascotVisitSchema = z.object({
   firstAt: z.string().nullable(),

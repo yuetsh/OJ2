@@ -7,14 +7,17 @@ import { MASCOT_QUESTIONS } from 'shared/mascot/chat'
 import { buildCollection } from 'shared/mascot/collection'
 import { mistakeList } from 'shared/mascot/mistakes'
 import { MASCOT_POSES, poseUrl } from 'shared/mascot/poses'
+import { useUserStore } from 'shared/store/user'
 import { parseTime } from 'utils/functions'
 
 /**
  * 主页上「小鲸鱼」那张卡：和看板娘的相处记录，点开看全的（各种互动几次、一天里什么时候来找她、
- * 回忆、她指出过的错、回答过她的问题、见过她的样子、台词收集）。只在自己的主页、学生、电脑上有（她只在电脑上出现）。
+ * 回忆、她指出过的错、回答过她的问题、见过她的样子、台词收集）。只在自己的主页、电脑上有（她只在电脑上出现），
+ * 学生、老师都有；老师的台词收集按老师听得到的那几组算。
  * 从没碰过她就不显示。
  */
 const theme = useThemeVars()
+const userStore = useUserStore()
 const journal = ref<MascotJournal | null>(null)
 const open = ref(false)
 
@@ -31,7 +34,7 @@ const dayIndex = (ms: number) => Math.floor((ms + TIME_ZONE_OFFSET_MINUTES * 60_
 /** 认识第几天（东八区日历日，认识那天是第 1 天） */
 const knownDays = computed(() => (journal.value?.firstAt ? dayIndex(Date.now()) - dayIndex(Date.parse(journal.value.firstAt)) + 1 : 0))
 
-const collection = computed(() => buildCollection(journal.value?.lines ?? []))
+const collection = computed(() => buildCollection(journal.value?.lines ?? [], userStore.isTeacherOrAbove))
 
 const tiles = computed(() => {
   const c = journal.value?.counts

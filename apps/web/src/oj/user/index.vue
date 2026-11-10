@@ -54,7 +54,7 @@ watch(username, load, { immediate: true })
 
 // 看板娘：只在看自己的主页时说话
 useMascotGuide(() => {
-  if (!isSelf.value || !profile.value || userStore.isTeacherOrAbove) return null
+  if (!isSelf.value || !profile.value) return null
   return { situation: 'profile', actions: [goAction(router, '我的成就', '/achievement'), goAction(router, '我的提交', '/submission?myself=1')] }
 })
 </script>
@@ -76,7 +76,7 @@ useMascotGuide(() => {
           <div class="column">
             <KnowledgeMap v-if="overview.knowledge" :map="overview.knowledge" :teacher="teacherView" />
             <AchievementCard :achievements="overview.achievements" :username="profile.user.username" :other="!isSelf" />
-            <MascotCard v-if="isSelf && !userStore.isTeacherOrAbove" />
+            <MascotCard v-if="isSelf" />
             <MascotVisitCard v-else-if="!isSelf" :username="profile.user.username" />
             <VersusCard v-if="overview.versus" :versus="overview.versus" :theirs="overview.solved.length" />
           </div>

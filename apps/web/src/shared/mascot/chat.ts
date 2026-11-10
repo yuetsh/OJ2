@@ -7,13 +7,15 @@ import { pick, type MascotPose } from './poses'
  * 这里只管说哪一种：跟手上在做的事配套的、自言自语、饿了困了、季节、冷知识、问同学一个问题、
  * 翻出同学以前的回答。按情况说的正事（错了、卡住了）走题目页的 requestSpeech，比闲聊优先。
  *
- * 只对学生。老师那边不闲聊。
+ * 学生、老师都聊。老师那边把编程冷知识换成课堂上的闲话（teacher.chat），问的问题也有几道不一样（MascotQuestion.only）。
  */
 
 export interface MascotQuestion {
   /** 记进 mascot_event 的 situation 是 `ask.<id>`，改了就认不出以前的回答，别改 */
   id: string
   text: string
+  /** 只问学生 / 只问老师；不写就都问 */
+  only?: 'student' | 'teacher'
   /** 两三个选项。key 落库，别改；label 是按钮上的字 */
   options: readonly {
     key: string
@@ -81,6 +83,7 @@ export const MASCOT_QUESTIONS: readonly MascotQuestion[] = [
   },
   {
     id: 'hard',
+    only: 'student',
     text: '这里的题，你觉得难吗？',
     options: [
       { key: 'easy', label: '不难', reply: ['口气不小', '那多做几道'], recall: ['说题不难的，今天做了几道', '不是说不难吗'], pose: 'smirk' },
@@ -89,6 +92,7 @@ export const MASCOT_QUESTIONS: readonly MascotQuestion[] = [
   },
   {
     id: 'break',
+    only: 'student',
     text: '下课一般干嘛？',
     options: [
       { key: 'game', label: '玩游戏', reply: ['带我一个', '玩完记得做题'], recall: ['下课又要去玩游戏了吧'], pose: 'gaming' },
@@ -106,6 +110,7 @@ export const MASCOT_QUESTIONS: readonly MascotQuestion[] = [
   },
   {
     id: 'job',
+    only: 'student',
     text: '以后想当程序员吗？',
     options: [
       { key: 'yes', label: '想', reply: ['那题得多做点', '有志气'], recall: ['想当程序员的，今天的题做了吗', '未来的程序员，加油……随口说的'], pose: 'bold' },
@@ -119,6 +124,47 @@ export const MASCOT_QUESTIONS: readonly MascotQuestion[] = [
     options: [
       { key: 'good', label: '还行', reply: ['那就好', '我也还行'], recall: ['上次你说心情还行，今天呢'] },
       { key: 'bad', label: '不太好', reply: ['……我陪你一会儿', '做道简单的，换换心情'], recall: ['上次你说心情不好，现在好点没'], pose: 'touched' },
+    ],
+  },
+  // ---- 只问老师的 ----
+  {
+    id: 'kids',
+    only: 'teacher',
+    text: '今天的学生听话吗？',
+    options: [
+      { key: 'good', label: '听话', reply: ['难得', '那就好，省心'], recall: ['上次说学生听话，今天呢', '学生还听话吧'] },
+      {
+        key: 'bad',
+        label: '不听话',
+        reply: ['……辛苦了', '我帮你盯着，谁摸鱼我都知道'],
+        recall: ['上次说学生不听话，今天好点没', '不听话的那几个，今天交题了吗'],
+        pose: 'unimpressed',
+      },
+    ],
+  },
+  {
+    id: 'tired',
+    only: 'teacher',
+    text: '上一天课，累不累？',
+    options: [
+      {
+        key: 'yes',
+        label: '累',
+        reply: ['坐会儿，喝口水', '……辛苦了，随口说的'],
+        recall: ['上次说上课累，今天少讲两句', '累了就让学生自己做题，我看着'],
+        pose: 'touched',
+      },
+      { key: 'no', label: '还行', reply: ['嘴硬', '那再加一节？'], recall: ['上次说不累的，今天还撑得住吗'], pose: 'smirk' },
+    ],
+  },
+  {
+    id: 'teach',
+    only: 'teacher',
+    text: '教 C 和教 Python，哪个省心？',
+    options: [
+      { key: 'c', label: 'C', reply: ['分号、大括号，你不嫌烦？', '硬核'], recall: ['你说教 C 省心的，今天学生漏分号了吗'] },
+      { key: 'python', label: 'Python', reply: ['缩进错的也不少吧', '我也觉得'], recall: ['你说教 Python 省心的，今天缩进都对齐了吗'] },
+      { key: 'neither', label: '都不省心', reply: ['……辛苦了', '学生也这么想'], recall: ['上次说教哪个都不省心，今天呢'], pose: 'sweat' },
     ],
   },
 ]
@@ -142,6 +188,8 @@ interface ChatContext {
   dressed: boolean
   /** 问过的问题和回答（id → 选项键）；还没拉到就是 null，这时不问也不翻 */
   answers: Record<string, string> | null
+  /** 在跟老师聊 */
+  teacher: boolean
 }
 
 /** 东八区的月份、钟点 */
@@ -175,8 +223,9 @@ export function chooseChat(ctx: ChatContext): MascotChat {
   if (posed && posed in MASCOT_LINES && Math.random() < 0.7) return { type: 'line', situation: posed, keepPose: true }
 
   const { month, hour } = wallClock()
-  const unasked = ctx.answers ? MASCOT_QUESTIONS.filter((q) => !(q.id in ctx.answers!)) : []
-  const answered = ctx.answers ? MASCOT_QUESTIONS.filter((q) => q.id in ctx.answers!) : []
+  const questions = MASCOT_QUESTIONS.filter((q) => !q.only || q.only === (ctx.teacher ? 'teacher' : 'student'))
+  const unasked = ctx.answers ? questions.filter((q) => !(q.id in ctx.answers!)) : []
+  const answered = ctx.answers ? questions.filter((q) => q.id in ctx.answers!) : []
   type Kind = 'self' | 'hungry' | 'sleepy' | 'season' | 'trivia' | 'ask' | 'recall' | 'affinity' | 'today' | 'outfit'
   const kind = weighted<Kind>([
     ['self', 20],
@@ -198,7 +247,7 @@ export function chooseChat(ctx: ChatContext): MascotChat {
     case 'season':
       return { type: 'line', situation: seasonSituation(month) }
     case 'trivia':
-      return { type: 'line', situation: 'chat.trivia' }
+      return { type: 'line', situation: ctx.teacher ? 'teacher.chat' : 'chat.trivia' }
     case 'ask':
       return { type: 'ask', question: pick(unasked) }
     case 'recall': {

@@ -97,7 +97,11 @@ const FINISHED = (result: number | undefined) =>
  * 题目页上看板娘说什么、给哪几个按钮。看的是这一页上最近的那件事：刚交的结果、刚跑的例子，
  * 都没有就看写没写代码。比赛入口不用管（Mascot.vue 在比赛里不弹）。
  *
- * 另外几件事她会主动开口（只对学生，频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
+ * 老师自己做题时和学生一样（指错、做对了说、跟着紧张），只是不劝举手、不说「卡住了问老师」，
+ * 什么都还没做（没交、没跑、代码没毛病）时说老师那几句（teacher.problem，带全班提交、编辑这道题）。
+ * 老师在学生的编辑器里协作时一声不吭：编辑器里是学生的代码，指错、帮改都不该冲着老师。
+ *
+ * 另外几件事她会主动开口（频率上限在 Mascot.vue）：同一道题错到第 5 次、连着 3 次
  * 没跑例子就交还错了、又犯了自己的老毛病（behavior.ts 的 habitSituation）、15 分钟没交没跑。
  * 做对了也说（priority：不受频率上限管，等点评弹框关了再说）；第一次做对的题攒了一条小鱼干，多半说这个。
  * 代码里有常见的错（utils/codeLint.ts：中文标点、函数名拼错、input 带提示语、缺冒号……），停手 LINT_PAUSE_MS
@@ -120,7 +124,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   const flowchartStore = useFlowchartStore()
   const challengeStore = useChallengeStore()
 
-  /** 学生在这道题上能用的几个按钮，点她和她主动开口共用 */
+  /** 在这道题上能用的几个按钮，点她和她主动开口共用（老师没有举手） */
   function studentActions(problem: ProblemDetail) {
     const language = codeStore.code.language
     const entry = ctx.value
@@ -128,7 +132,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       problem.samples.length && language !== 'Flowchart' && language !== 'SQL' ? { label: '运行例子', run: submissionStore.runSamples } : null
     // 和工具栏的「举手求助」同一个条件；已经举着手、老师在帮的时候不给
     const help: MascotAction | null =
-      entry.help && isDesktop.value && !userStore.demoMode && language !== 'Flowchart' && collabStore.helpStatus === 'idle'
+      entry.help && isDesktop.value && !userStore.isTeacherOrAbove && !userStore.demoMode && language !== 'Flowchart' && collabStore.helpStatus === 'idle'
         ? { label: '举手求助', run: () => collabStore.requestHelp(problem._id, language) }
         : null
     const why: MascotAction = { label: '我错在哪', run: () => showResult('submit') }
@@ -202,14 +206,16 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const problem = problemStore.problem
     if (!problem) return null
 
-    if (userStore.isTeacherOrAbove) {
-      // 协作中别把老师带离这一页：跳走协作就断了
-      if (teacherCollab.value) return null
+    const teacher = userStore.isTeacherOrAbove
+    // 协作中别把老师带离这一页（跳走协作就断了），编辑器里也是学生的代码：不说
+    if (teacher && teacherCollab.value) return null
+    /** 老师还没在这道题上做什么的时候说的：去看全班的提交、改题 */
+    const teacherIdle = () => {
       const actions: MascotAction[] = [{ label: '全班这题的提交', run: () => router.push({ name: 'submissions', query: { problem: problem._id } }) }]
       if (isDesktop.value && userStore.canEditProblem(problem)) {
         actions.push({ label: '编辑这道题', run: () => window.open(router.resolve(`/admin/problem/edit/${problem.id}`).href, '_blank') })
       }
-      return { situation: 'teacher.problem', actions }
+      return { situation: 'teacher.problem' as const, actions }
     }
 
     const entry = ctx.value
@@ -220,7 +226,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       const grade = flowchartStore.latestRating.grade
       if (grade === 'S') return guide('flowchart.good', help)
       if (grade && !isFlowchartPass(grade)) return guide('flowchart.low', help)
-      return guide('problem.flowchart', help)
+      return teacher ? teacherIdle() : guide('problem.flowchart', help)
     }
     // 正在判、正在跑例子：没什么好说的，打个招呼
     if (submissionStore.judging || submissionStore.pending || submissionStore.trial.samplesRunning.value) return null
@@ -228,7 +234,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     const issue = currentIssues()[0]
     if (issue) return lintGuide(issue)
 
-    const stuck = problemStore.failCount >= STUCK_FAILS
+    // 「卡住了」那组是劝举手、问老师的，老师不说
+    const stuck = !teacher && problemStore.failCount >= STUCK_FAILS
     if (submissionStore.syntaxErrorInfo) return stuck ? guide('problem.stuck', help, why) : guide('problem.compileError', why, help)
 
     const runs = submissionStore.trial.sampleRuns.value
@@ -263,6 +270,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       return guide(failed, ...actions)
     }
 
+    if (teacher) return teacherIdle()
     // 这两种只说话、只留举手：上线第一天「做过了」的「下一道」没人点过，空着代码跑例子也没意义，
     // 而空白页上「举手求助」是真有人点（不会下手）。没有按钮的气泡 5 秒自己收起，不一直挡着
     if (problem.myStatus === SubmissionStatus.accepted) return guide('problem.solvedBefore')
@@ -288,9 +296,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     }
   })
 
-  // ---- 主动开口（只对学生；比赛里 Mascot.vue 不弹）----
+  // ---- 主动开口（比赛里 Mascot.vue 不弹）----
 
-  const student = () => userStore.isAuthed && !userStore.isTeacherOrAbove && ctx.value.entry !== 'contest'
+  /** 自己在这道题上做（不是比赛、老师不在学生的编辑器里）：她才跟着说、跟着动 */
+  const working = () => userStore.isAuthed && ctx.value.entry !== 'contest' && !teacherCollab.value
 
   /** 这道题上连着几次没跑例子就交了。跑过一次例子就清零 */
   let unsampledSubmits = 0
@@ -316,7 +325,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       if (!at) return
       sampledSinceSubmit = true
       lastActivity = Date.now()
-      if (student()) logMascotEvent({ kind: 'trial', action: 'samples' })
+      if (working()) logMascotEvent({ kind: 'trial', action: 'samples' })
     },
   )
   // 「运行例子」「自己输入」「举手」别处都不存，记下来给她看一周的习惯（behavior.ts）
@@ -325,13 +334,13 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     (running) => {
       if (!running) return
       lastActivity = Date.now()
-      if (student()) logMascotEvent({ kind: 'trial', action: 'custom' })
+      if (working()) logMascotEvent({ kind: 'trial', action: 'custom' })
     },
   )
   watch(
     () => collabStore.helpStatus,
     (status, previous) => {
-      if (status === 'pending' && previous === 'idle' && student()) logMascotEvent({ kind: 'help' })
+      if (status === 'pending' && previous === 'idle' && working()) logMascotEvent({ kind: 'help' })
     },
   )
   watch(
@@ -351,7 +360,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     () => [submissionStore.submission?.id, submissionStore.submission?.result] as const,
     ([id, result]) => {
       const problem = problemStore.problem
-      if (!id || !FINISHED(result) || !problem || !student()) return
+      if (!id || !FINISHED(result) || !problem || !working()) return
       refreshMascotProfile(true)
       if (result === SubmissionStatus.accepted) {
         requestSpeech({ key: `ac:${problem.id}`, situation: acceptedSituation(problem._id), priority: true, cheer: true })
@@ -360,7 +369,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       const failed = RESULT_SITUATION[result as SubmissionStatus]
       if (!failed) return
       const { runSamples, help, why } = studentActions(problem)
-      if (problemStore.failCount >= STUCK_FAILS) {
+      if (problemStore.failCount >= STUCK_FAILS && !userStore.isTeacherOrAbove) {
         requestSpeech({ key: `stuck:${problem.id}`, ...guide('problem.stuck', help, why) })
       } else if (unsampledSubmits >= UNSAMPLED_SUBMITS && runSamples) {
         requestSpeech({ key: `unsampled:${problem.id}`, ...guide('habit.noSamples', runSamples) })
@@ -391,7 +400,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     () => {
       clearTimeout(editingTimer)
       const problem = problemStore.problem
-      if (!problem || !student()) return
+      if (!problem || !working()) return
       const editing = activeLine()
       const keyOf = (it: LintIssue) => `lint:${problem.id}:${it.key}`
       const fresh = currentIssues().filter((it) => !spokenSpeechKeys.has(keyOf(it)))
@@ -422,7 +431,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   watch(
     () => submissionStore.trial.samplesRunning.value,
     (running, was) => {
-      if (!student()) return
+      if (!working()) return
       if (running) return reactMascot('curious')
       if (!was) return
       const runs = submissionStore.trial.sampleRuns.value
@@ -433,7 +442,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   watch(
     () => submissionStore.judging || submissionStore.pending,
     (busy, was) => {
-      if (!student()) return
+      if (!working()) return
       if (busy) return reactMascot('fluster')
       if (!was) return
       // 做对了有欢呼（上面 priority 那句），这里只管收起；没做对难过一下
@@ -450,7 +459,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       const now = Date.now()
       if (now - lastTyped > TYPING_GAP_MS) streakStart = now
       lastTyped = now
-      if (!student() || now - streakStart < TYPING_STREAK_MS || now - cheeredAt < CHEER_COOLDOWN_MS) return
+      if (!working() || now - streakStart < TYPING_STREAK_MS || now - cheeredAt < CHEER_COOLDOWN_MS) return
       cheeredAt = now
       streakStart = now
       reactMascot('cheer', 3000)
@@ -458,10 +467,10 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   )
   onScopeDispose(() => reactMascot(null))
 
-  // 盯着一道没做对的题 15 分钟，没交也没跑：问一句
+  // 盯着一道没做对的题 15 分钟，没交也没跑：问一句。老师开着题多半是在看、在讲，不问
   useIntervalFn(() => {
     const problem = problemStore.problem
-    if (!problem || !student() || Date.now() - lastActivity < IDLE_MS) return
+    if (!problem || !working() || userStore.isTeacherOrAbove || Date.now() - lastActivity < IDLE_MS) return
     if (problem.myStatus === SubmissionStatus.accepted || submissionStore.submission?.result === SubmissionStatus.accepted) return
     if (codeStore.code.language === 'Flowchart') return
     const { runSamples, help } = studentActions(problem)

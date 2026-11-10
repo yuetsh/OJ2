@@ -9,7 +9,7 @@ import { MASCOT_POSES, poseUrl, type MascotPose } from 'shared/mascot/poses'
  * 串门：看同学的主页时，对方的小鲸鱼今天穿着什么、认识多久、见过几个样子。
  * 衣服是拿小鱼干换的，穿了要有人看得到才有意思。互动次数、听过的话不给别人看（后端就没给）。
  * 老师看学生的主页时多一段「她指出过的错」（后端只给老师），同学之间没有。
- * 对方从没碰过她（或者是老师）就不显示。
+ * 对方从没碰过她就不显示（老师也有自己的小鲸鱼，一样串门）。
  */
 const props = defineProps<{ username: string }>()
 const theme = useThemeVars()

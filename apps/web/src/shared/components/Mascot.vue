@@ -11,13 +11,15 @@
  * - 按下去像玩偶一样压扁（底边不动），松手弹回。
  * - 点一下冒气泡：一句话加最多三个按钮，按页面、按情况变（页面经 shared/mascot/guide.ts 告诉她），
  *   台词在 shared/mascot/lines.ts。比赛里点她不弹气泡。再点一下、点别处、换页面都收起。
- * - 对学生按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）。好感按一共做对几道分五档，
+ * - 学生、老师玩的是同一套（下面这些都有）；老师另有自己那几页的话（teacher.*），口气对不上的几组台词
+ *   有老师版（lines.ts 的 MASCOT_TEACHER_LINES）。
+ * - 按行为挑话（常犯的错、今天做了几道、熟不熟，见 shared/mascot/behavior.ts）。好感按一共做对几道分五档，
  *   高档多几组软一点的话、也更耐烦（档位不显示）。跨天记得几件事（前几天惹她生气、摸过头、今天升了档），
  *   今天第一次闲聊时翻一次旧账；
  *   题目页上有几件事她会主动开口，频率上限在下面 SPEAK_GAP_MS。
- * - 闲聊：对学生，没人理她时隔 CHAT_GAP_* 自己说一句（说什么见 shared/mascot/chat.ts），会问同学问题、
+ * - 闲聊：没人理她时隔 CHAT_GAP_* 自己说一句（说什么见 shared/mascot/chat.ts），会问同学问题、
  *   带按钮回答。正在敲键盘、刚冒过气泡、比赛里都不说；睡着了说梦话，不醒。
- * - 小鱼干：学生做对新题攒（behavior.ts 的 fishLeft），脚边一个小牌子写着几条，拖到她身上就喂了，
+ * - 小鱼干：做对新题攒（behavior.ts 的 fishLeft），脚边一个小牌子写着几条，拖到她身上就喂了，
  *   两分钟喂到 FULL_AFTER 条就饱了、一会儿再喂；生闷气时喂一条就哄好了，睡着了喂醒。
  * - 衣柜：点一下小鱼干牌子打开，拿小鱼干换一身（MASCOT_OUTFIT_COSTS：节日装 5 条、日常装 3 条），穿到当天结束；换回平时那身不花鱼。
  * - 指着说：题目页发来带 anchorY 的话（中文标点在第几行），她滑到屏幕右边那一行的高度探头说，
@@ -40,7 +42,7 @@
  */
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import { dailyPose, festivalPose, napPose, PEEK_SIZE, pick as pickOne, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
-import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
+import { mascotLines, type MascotSituation } from 'shared/mascot/lines'
 import { MASCOT_OUTFIT_COSTS, MASCOT_OUTFITS, type MascotOutfit } from '@oj2/contract'
 import { chooseChat, type MascotQuestion } from 'shared/mascot/chat'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
@@ -639,11 +641,10 @@ function close() {
 function toggleBubble() {
   if (bubble.value) return close()
   if (silent.value) return
-  let guide = resolveGuide()
-  if (!userStore.isTeacherOrAbove) guide = personalize(guide)
+  let guide = personalize(resolveGuide())
   let serious = SERIOUS.has(guide.situation)
   // 今天挑的题：不在题目页（那里说的是手上这道题的事）、没有要紧事时，这一页头一次点她就提
-  if (!serious && isStudent.value && !route.path.startsWith('/problem/') && !napping.value && !sulking.value) {
+  if (!serious && userStore.isAuthed && !route.path.startsWith('/problem/') && !napping.value && !sulking.value) {
     const offer = dailyOffer()
     if (offer) {
       guide = offer
@@ -728,28 +729,30 @@ function pickFor(guide: MascotGuide) {
   if (!SERIOUS.has(situation) && !PESTERED.has(situation) && situation !== 'memory.closer' && guide.n === undefined && !guide.vars) {
     const timely = timeSituation()
     if (Math.random() < RARE_CHANCE) situation = 'rare'
-    else if (timely && !userStore.isTeacherOrAbove && Math.random() < TIME_CHANCE) situation = timely
+    else if (timely && Math.random() < TIME_CHANCE) situation = timely
   }
   return { text: fillLine(pick(situation), guide), situation }
 }
 
 /**
  * 每组台词洗成一副牌，抽完再洗：一组听完之前不会重复。新洗的一副头一张不和上一句一样。
- * 牌放在内存里，换页面不丢（看板娘挂在布局上），刷新才重洗
+ * 牌放在内存里，换页面不丢（看板娘挂在布局上），刷新才重洗。老师听的那一版另洗一副（换了人登录不串）
  */
-const decks = new Map<MascotSituation, string[]>()
+const decks = new Map<string, string[]>()
 let lastLine = ''
 function pick(situation: MascotSituation) {
-  let deck = decks.get(situation)
+  const teacher = userStore.isTeacherOrAbove
+  const deckKey = `${teacher ? 't' : 's'}:${situation}`
+  let deck = decks.get(deckKey)
   if (!deck?.length) {
-    deck = [...MASCOT_LINES[situation]]
+    deck = [...mascotLines(situation, teacher)]
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[deck[i], deck[j]] = [deck[j]!, deck[i]!]
     }
     // 从末尾往前抽，所以要错开的是最后一张
     if (deck.length > 1 && deck[deck.length - 1] === lastLine) [deck[0], deck[deck.length - 1]] = [deck[deck.length - 1]!, deck[0]!]
-    decks.set(situation, deck)
+    decks.set(deckKey, deck)
   }
   lastLine = deck.pop()!
   return lastLine
@@ -876,14 +879,13 @@ watch(bubble, (now) => {
 })
 
 // ---- 小鱼干 ----
-const isStudent = computed(() => userStore.isAuthed && !userStore.isTeacherOrAbove)
 /** 正拿着一条小鱼干往她那儿拖：指针在视口里的位置 */
 const fishDrag = ref<{ x: number; y: number } | null>(null)
 let fishStart = { x: 0, y: 0 }
 const fishNear = ref(false)
 // 穿着换的衣服时鱼花光了也留着牌子：衣柜从这里开，还能换回来
 const showFish = computed(
-  () => isStudent.value && !silent.value && !peek.value && !dragging.value && !flying.value && (fishLeft.value > 0 || !!mascotOutfit.value),
+  () => userStore.isAuthed && !silent.value && !peek.value && !dragging.value && !flying.value && (fishLeft.value > 0 || !!mascotOutfit.value),
 )
 /** 多了一条时牌子蹦一下 */
 const fishBump = ref(false)
@@ -1025,7 +1027,7 @@ watch(collectReward, (n) => {
   setTimeout(() => clearInterval(wait), 120_000)
 })
 
-// ---- 闲聊：没人理她，隔几分钟自己说一句（只对学生）----
+// ---- 闲聊：没人理她，隔几分钟自己说一句 ----
 let nextChatAt = performance.now() + CHAT_FIRST_MS
 let lastKeyAt = -Infinity
 // 敲代码、打字时别插嘴。捕获阶段听，编辑器拦了冒泡也听得到
@@ -1034,7 +1036,7 @@ useEventListener(window, 'keydown', () => (lastKeyAt = performance.now()), { cap
 useIntervalFn(() => {
   const now = performance.now()
   if (now < nextChatAt) return
-  if (!userStore.isAuthed || userStore.isTeacherOrAbove) return
+  if (!userStore.isAuthed) return
   if (silent.value || dragging.value || flying.value || sulking.value || patting.value || bubble.value) return
   if (document.visibilityState !== 'visible') return
   // 不到时候就等下一轮再看，不重新抽间隔
@@ -1068,6 +1070,7 @@ function chat() {
     dressed: !!mascotOutfit.value,
     todaySolved: profile?.todaySolved ?? 0,
     answers: profile?.answers ?? null,
+    teacher: userStore.isTeacherOrAbove,
   })
   if (next.type === 'ask') {
     const question = next.question
@@ -1097,7 +1100,7 @@ function answer(question: MascotQuestion, option: MascotQuestion['options'][numb
   noteAnswer(question.id, option.key)
 }
 
-// 学生的行为数：进站、换页面时拉（30 秒内拉过就不拉），登录换人时重拉
+// 行为数：进站、换页面时拉（30 秒内拉过就不拉），登录换人时重拉
 watch(
   () => route.fullPath,
   () => refreshMascotProfile(),
@@ -1213,13 +1216,13 @@ watch(
   },
 )
 
-// ---- 见过她的样子：学生第一次看到某个姿势记一条 pose（见过的从 profile 里来，这一页记过的不再记）----
+// ---- 见过她的样子：第一次看到某个姿势记一条 pose（见过的从 profile 里来，这一页记过的不再记）----
 const posesLogged = new Set<string>()
 watch(
   () => [shownPose.value, mascotProfile.value?.poses] as const,
   ([shown, known]) => {
     // 还没拉到这个人见过哪些就先不记，拉到了这个 watch 会再跑一遍
-    if (!known || !isStudent.value || known.includes(shown) || posesLogged.has(shown)) return
+    if (!known || !userStore.isAuthed || known.includes(shown) || posesLogged.has(shown)) return
     posesLogged.add(shown)
     // 记完拉一遍：见过的样子到了新的一档，后端会多送小鱼干
     void logMascotEvent({ kind: 'pose', action: shown }).then(() => refreshMascotProfile(true))

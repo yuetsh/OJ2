@@ -1,9 +1,10 @@
-import { MASCOT_LINES, type MascotSituation } from './lines'
+import { MASCOT_LINES, MASCOT_STUDENT_ONLY, mascotLines, type MascotSituation } from './lines'
 
 /**
- * 台词收集：她对这个学生说过哪些话，和台词表（lines.ts）对一遍，按组数听过几句、还差几句。
+ * 台词收集：她对这个人说过哪些话，和台词表（lines.ts）对一遍，按组数听过几句、还差几句。
  *
- * 只收学生听得到的：老师那边的（teacher.*）、没登录时说的（guest）不算。几组里一模一样的句子
+ * 只收这个人听得到的：学生不算老师那边的（teacher.*），老师不算只对学生说的（MASCOT_STUDENT_ONLY），
+ * 有老师版的组老师按老师版算；没登录时说的（guest）都不算。几组里一模一样的句子
  * （「好饿」）只算一句。闲聊问的问题、翻旧账的回答在 chat.ts，不在表里，也不算。
  *
  * 库里记的是填好数的那一句（「还差 3 道」），所以带占位的台词按通配对。
@@ -22,7 +23,8 @@ const prefix =
 /** 按顺序认，先认到的那组算 */
 const GROUPS: Group[] = [
   { name: '打招呼', test: prefix('greet', 'first', 'familiar', 'wake', 'home.back', 'notFound', 'offHours', 'time', 'day') },
-  { name: '闲聊', test: prefix('chat') },
+  { name: '闲聊', test: prefix('chat', 'teacher.chat') },
+  { name: '上课的时候', test: prefix('teacher') },
   { name: '做题的时候', test: prefix('problem', 'class', 'habit', 'idle', 'gentle', 'flowchart', 'submission', 'lint') },
   {
     name: '逛别的页面',
@@ -50,7 +52,10 @@ const GROUPS: Group[] = [
   { name: '稀有', test: prefix('rare') },
 ]
 
-const HIDDEN = prefix('teacher', 'guest')
+const HIDDEN = {
+  student: prefix('teacher', 'guest'),
+  teacher: prefix('guest', ...MASCOT_STUDENT_ONLY),
+}
 
 export interface CollectionLine {
   /** 台词原文，占位换成「…」；没听过的是一串问号，和原句差不多长 */
@@ -76,26 +81,34 @@ function entryOf(template: string): Entry {
   return { template, match: (line) => re.test(line) }
 }
 
-/** 按组排好的整张表，只建一次 */
-const TABLE: { name: string; entries: Entry[] }[] = (() => {
+/** 按组排好的整张表，学生、老师各一张，用到才建 */
+const tables = new Map<boolean, { name: string; entries: Entry[] }[]>()
+function tableFor(teacher: boolean) {
+  let table = tables.get(teacher)
+  if (!table) tables.set(teacher, (table = buildTable(teacher)))
+  return table
+}
+
+function buildTable(teacher: boolean) {
+  const hidden = HIDDEN[teacher ? 'teacher' : 'student']
   const seen = new Set<string>()
   const groups = GROUPS.map((group) => ({ name: group.name, entries: [] as Entry[] }))
   for (const situation of Object.keys(MASCOT_LINES) as MascotSituation[]) {
-    if (HIDDEN(situation)) continue
+    if (hidden(situation)) continue
     const index = GROUPS.findIndex((group) => group.test(situation))
     if (index < 0) continue
-    for (const template of MASCOT_LINES[situation]) {
+    for (const template of mascotLines(situation, teacher)) {
       if (seen.has(template)) continue
       seen.add(template)
       groups[index]!.entries.push(entryOf(template))
     }
   }
   return groups.filter((group) => group.entries.length)
-})()
+}
 
-export function buildCollection(heardLines: readonly string[]) {
+export function buildCollection(heardLines: readonly string[], teacher = false) {
   const exact = new Set(heardLines)
-  const groups: CollectionGroup[] = TABLE.map(({ name, entries }) => {
+  const groups: CollectionGroup[] = tableFor(teacher).map(({ name, entries }) => {
     const lines = entries.map(({ template, match }) => ({
       text: template.replace(/\{\w+\}/g, '…'),
       heard: exact.has(template) || (template.includes('{') && heardLines.some(match)),

@@ -6,10 +6,11 @@ import type { MascotSituation } from './lines'
 import type { MascotPose } from './poses'
 
 /**
- * 看板娘按学生的行为挑话：常犯哪类错、今天做了几道、和她熟不熟。数从 GET /mascot/profile 来，
+ * 看板娘按人的行为挑话：常犯哪类错、今天做了几道、和她熟不熟。数从 GET /mascot/profile 来，
  * 那边按库里的提交和互动记录算；互动本身经 logMascotEvent 记进 mascot_event。
  *
- * 只对学生。老师的话不跟着行为变。
+ * 登录了的都有，学生、老师一套算法（老师也攒小鱼干、也有好感档）。老师专属的话（teacher.*）不跟着行为变，
+ * 只有闲着打招呼那句（teacher.greet）会翻旧账、掺熟了以后的话。
  */
 
 /** 记一条互动。只记登录了的，失败就算了：前台一般不等它、也不提示（换衣服要等它落库再拉数） */
@@ -31,7 +32,7 @@ const STALE_MS = 30_000
 
 export function refreshMascotProfile(force = false) {
   const userStore = useUserStore()
-  if (!userStore.isAuthed || userStore.isTeacherOrAbove) {
+  if (!userStore.isAuthed) {
     mascotProfile.value = null
     return null
   }
@@ -69,7 +70,7 @@ let fishUserId: number | null = null
 let fishBase = 0
 const usedLocally = ref(0)
 
-/** 手里还剩几条小鱼干（只对学生，没拉到数是 0） */
+/** 手里还剩几条小鱼干（没登录、没拉到数是 0） */
 export const fishLeft = computed(() => {
   const fish = mascotProfile.value?.fish
   if (!fish) return 0
@@ -163,7 +164,7 @@ const FAMILIAR_CHANCE = 0.2
 const FAMILIAR_POKES = 50
 /** 今天做到这么多道才拿出来说 */
 const TODAY_MIN = 3
-const GREETINGS = new Set<MascotSituation>(['greet', 'announcement', 'achievement', 'profile'])
+const GREETINGS = new Set<MascotSituation>(['greet', 'teacher.greet', 'announcement', 'achievement', 'profile'])
 const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry', 'problem.finally', 'home.done', 'home.assigned', 'home.free'])
 
 /**
@@ -172,7 +173,7 @@ const PRAISE = new Set<MascotSituation>(['problem.accepted', 'problem.firstTry',
  * 所以前四档大约各占四分之一，最高一档是前一成。档位不显示，学生自己感觉出来
  */
 const AFFINITY_TIERS = [10, 25, 40, 100] as const
-/** 0 是还不熟（没有额外的话），1～4 对应 lines.ts 的 affinity.1～4。老师、没拉到数都是 0 */
+/** 0 是还不熟（没有额外的话），1～4 对应 lines.ts 的 affinity.1～4（老师听的是 MASCOT_TEACHER_LINES 里那一版）。没拉到数是 0 */
 export function affinityTier() {
   return tierOf(mascotProfile.value?.solved ?? 0)
 }
@@ -183,6 +184,7 @@ const AFFINITY_CHANCE = 0.25
 /** 掺好感台词的情况：闲聊、夸人，加上学生最常点她的空白题目页、题目列表（第一天点开的四成在这两处） */
 const CHATTY = new Set<MascotSituation>([
   'greet',
+  'teacher.greet',
   'announcement',
   'achievement',
   'profile',
@@ -236,10 +238,11 @@ function memoryGuide(profile: MascotProfile): Pick<MascotGuide, 'situation' | 'v
   return null
 }
 
-/** 点她的时候：按行为把页面给的情况换成更贴这个学生的那一组（按钮不变） */
+/** 点她的时候：按行为把页面给的情况换成更贴这个人的那一组（按钮不变） */
 export function personalize(guide: MascotGuide): MascotGuide {
   const profile = mascotProfile.value
-  if (!profile) return guide
+  // 有学生举着手：初次见面也先说这个
+  if (!profile || guide.situation === 'teacher.help') return guide
   if (profile.pokes + sessionPokes === 0) return { ...guide, situation: 'first.meet', n: undefined, vars: undefined }
   const situation = guide.situation
   if (CHATTY.has(situation)) {
