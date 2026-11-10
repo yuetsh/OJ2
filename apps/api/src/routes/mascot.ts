@@ -1,4 +1,5 @@
 import {
+  MASCOT_DAILY_BONUS,
   MASCOT_FISH_GIFT,
   MASCOT_FISH_SINCE,
   MASCOT_OUTFIT_COST,
@@ -6,15 +7,17 @@ import {
   MASCOT_OUTFITS,
   MASCOT_SPOKEN_KINDS,
   mascotEventSchema,
+  type MascotEventKind,
   type MascotJournal,
   type MascotProfile,
+  type MascotVisit,
 } from '@oj2/contract'
 import { and, count, countDistinct, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
-import { parseBody, success } from '../http'
+import { failure, parseBody, success } from '../http'
 import { JudgeStatus } from '../judge/status'
 import { calendarDay, dayNumber, dayStart, localDateTime, localTime, weekStart } from '../time'
 
@@ -49,6 +52,8 @@ mascotRoutes.post('/mascot/events', requireAuth, async (c) => {
     const { kind, situation, line, action, path } = parsed.data
     // 换衣服花的是小鱼干：衣服得在单子上、鱼得够，不然不记（前台本来就不让点，这里防脚本）
     if (kind === 'dress' && !(await canDress(user.id, action))) return success(c, null)
+    // 每天挑的题只有后端记（dailyOf），前台发来的不收：它决定多给几条小鱼干
+    if (kind === 'daily') return success(c, null)
     await db.insert(schema.mascotEvent).values({ userId: user.id, kind, situation, line, action, path })
   }
   return success(c, null)
@@ -60,6 +65,9 @@ async function canDress(userId: number, outfit: string | undefined) {
   const fish = await fishOf(userId)
   return MASCOT_FISH_GIFT + fish.earned - fish.fed - fish.spent >= MASCOT_OUTFIT_COST
 }
+
+/** 算「来找过她」的事：对她做的，不含跑例子、举手、后端自己记的 */
+const TOUCH_KINDS = ['open', 'action', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'dress'] as const satisfies readonly MascotEventKind[]
 
 /** 跨天记得的事只翻这么多天以内的 */
 const MEMORY_DAYS = 7
@@ -92,6 +100,7 @@ async function memoryOf(userId: number) {
     pat_at: string | null
     pat_said_at: string | null
     closer_at: string | null
+    streak_at: string | null
     solved_before: number
   }>(sql`
     select
@@ -100,13 +109,31 @@ async function memoryOf(userId: number) {
       ${last('pat', null, true)} as pat_at,
       ${last('open', 'memory.pat', false)} as pat_said_at,
       ${last('open', 'memory.closer', false)} as closer_at,
+      ${last('open', 'memory.streak', false)} as streak_at,
       (
         select count(distinct ${s.problemId})::int from ${s}
         where ${s.userId} = ${userId} and ${s.result} in (${JudgeStatus.ACCEPTED}, ${JudgeStatus.AST_CHECK_FAILED})
           and ${s.createTime} < ${today}
       ) as solved_before
   `)
+  // 连着几天来找她：今天以前连着的天数 + 今天这一天（这会儿正在找她）
+  const days = await db
+    .selectDistinct({ day: sql<string>`(${localTime(e.createdAt)})::date::text` })
+    .from(e)
+    .where(
+      and(
+        eq(e.userId, userId),
+        inArray(e.kind, [...TOUCH_KINDS]),
+        gte(e.createdAt, new Date(Date.parse(today) - 60 * 86_400_000).toISOString()),
+        sql`${e.createdAt} < ${today}`,
+      ),
+    )
+  const visited = new Set(days.map((it) => dayNumber(it.day)))
+  let streak = 1
+  for (let day = dayNumber(calendarDay()) - 1; visited.has(day); day--) streak++
   return {
+    streakDays: streak,
+    streakSaidToday: !!row?.streak_at && Date.parse(row.streak_at) >= Date.parse(today),
     grudgeDaysAgo: daysAgo(row?.sulk_at ?? null, row?.grudge_at ?? null),
     patDaysAgo: daysAgo(row?.pat_at ?? null, row?.pat_said_at ?? null),
     solvedBeforeToday: row?.solved_before ?? 0,
@@ -128,6 +155,19 @@ async function fishOf(userId: number) {
           group by ${s.problemId}
           having min(${s.createTime}) >= ${since}
         ) first_solved
+      ) + ${MASCOT_DAILY_BONUS} * (
+        -- 她每天挑的题（一天取最早记的那条），当天做对了的天数
+        select count(*)::int from (
+          select distinct on ((${localTime(e.createdAt)})::date) ${e.action} as problem, (${localTime(e.createdAt)})::date as day
+          from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'daily'
+          order by (${localTime(e.createdAt)})::date, ${e.createdAt}
+        ) d
+        where exists (
+          select 1 from ${s}
+          where ${s.userId} = ${userId} and ${s.problemId} = d.problem::int
+            and ${s.result} in (${JudgeStatus.ACCEPTED}, ${JudgeStatus.AST_CHECK_FAILED})
+            and (${localTime(s.createTime)})::date = d.day
+        )
       ) as earned,
       (select count(*)::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'feed') as fed,
       (
@@ -150,6 +190,53 @@ async function outfitOf(userId: number) {
   return row?.outfit && row.outfit !== MASCOT_OUTFIT_NONE ? row.outfit : null
 }
 
+/**
+ * 她今天给挑的题：今天第一次问到时挑一道记下（daily 事件），之后都是这道。挑的是公开的、不是比赛的、
+ * 难度不是「难」、能用 Python 或 C 写、这个学生没做对过的题，随机一道；都做完了就是 null
+ */
+async function dailyOf(userId: number) {
+  const e = schema.mascotEvent
+  const s = schema.submission
+  const p = schema.problem
+  const today = dayStart()
+  const accepted = inArray(s.result, [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILED])
+  const [picked] = await db
+    .select({ action: e.action })
+    .from(e)
+    .where(and(eq(e.userId, userId), eq(e.kind, 'daily'), gte(e.createdAt, today)))
+    .orderBy(e.createdAt)
+    .limit(1)
+  let id = picked?.action ? Number(picked.action) : null
+  if (!id) {
+    const [row] = await db
+      .select({ id: p.id })
+      .from(p)
+      .where(
+        and(
+          eq(p.visible, true),
+          isNull(p.contestId),
+          sql`${p.difficulty} <> 'High'`,
+          sql`${p.languages} ?| array['Python', 'C', 'C++']`,
+          sql`not exists (select 1 from ${s} where ${s.userId} = ${userId} and ${s.problemId} = ${p.id} and ${accepted})`,
+        ),
+      )
+      .orderBy(sql`random()`)
+      .limit(1)
+    if (!row) return null
+    id = row.id
+    await db.insert(e).values({ userId, kind: 'daily', action: String(id), path: '/' })
+  }
+  const [[problem], [done]] = await Promise.all([
+    db.select({ displayId: p.displayId }).from(p).where(eq(p.id, id)).limit(1),
+    db
+      .select({ id: s.id })
+      .from(s)
+      .where(and(eq(s.userId, userId), eq(s.problemId, id), accepted, gte(s.createTime, today)))
+      .limit(1),
+  ])
+  return problem ? { problemId: problem.displayId, done: !!done } : null
+}
+
 /** 见过她哪些样子：pose 事件的姿势名，去重 */
 async function posesOf(userId: number) {
   const e = schema.mascotEvent
@@ -170,7 +257,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
 
   const week = weekStart()
   const e = schema.mascotEvent
-  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish, poses, outfit] = await Promise.all([
+  const [pokes, solved, memory, today, recent, tooHard, weekSubmits, weekEvents, weekHints, answers, fish, poses, outfit, daily] = await Promise.all([
     db
       .select({ value: count() })
       .from(schema.mascotEvent)
@@ -218,6 +305,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
     fishOf(userId),
     posesOf(userId),
     outfitOf(userId),
+    dailyOf(userId),
   ])
   const eventCount = (kind: string) => weekEvents.find((row) => row.kind === kind)?.value ?? 0
 
@@ -233,6 +321,7 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
     todaySolved: today[0]?.value ?? 0,
     tooHard: tooHard[0]?.value ?? 0,
     fish,
+    daily,
     outfit,
     poses,
     answers: Object.fromEntries(answers.filter((row) => row.situation?.startsWith('ask.') && row.action).map((row) => [row.situation!.slice(4), row.action!])),
@@ -305,4 +394,24 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
     lines: lines.map((it) => it.line!),
     poses,
   } satisfies MascotJournal)
+})
+
+/** 串门：同学的小鲸鱼今天穿着什么（契约 mascotVisitSchema） */
+mascotRoutes.get('/mascot/of/:username', requireAuth, async (c) => {
+  const [target] = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(and(sql`lower(${schema.user.username}) = lower(${c.req.param('username')})`, eq(schema.user.isDisabled, false)))
+    .limit(1)
+  if (!target) return failure(c, 404, 'user-not-found', '没有这个用户')
+  const e = schema.mascotEvent
+  const [first, outfit, poses] = await Promise.all([
+    db
+      .select({ at: sql<string | null>`min(${e.createdAt})` })
+      .from(e)
+      .where(and(eq(e.userId, target.id), inArray(e.kind, ['open', 'pat', 'move', 'play', 'feed', 'dress']))),
+    outfitOf(target.id),
+    posesOf(target.id),
+  ])
+  return success(c, { firstAt: first[0]?.at ?? null, outfit, poses: poses.length } satisfies MascotVisit)
 })

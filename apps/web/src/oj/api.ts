@@ -7,6 +7,7 @@ import type {
   FormatCodeRequest,
   JoinProblemSetRequest,
   MascotJournal,
+  MascotVisit,
   RankHiddenRequest,
   SetReactionRequest,
   UpdateProfileRequest,
@@ -380,6 +381,11 @@ export function getProfileOverview(username: string) {
 /** 和看板娘的相处记录（只有自己的），主页那张卡用 */
 export function getMascotJournal() {
   return api.get<MascotJournal>('mascot/journal')
+}
+
+/** 串门：同学的小鲸鱼今天穿着什么 */
+export function getMascotVisit(username: string) {
+  return api.get<MascotVisit>(`mascot/of/${encodeURIComponent(username)}`)
 }
 
 /** 不用图片了，退回默认头像（名字的字） */

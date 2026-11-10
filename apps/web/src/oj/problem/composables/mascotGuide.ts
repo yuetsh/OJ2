@@ -1,7 +1,7 @@
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { HINT_MIN_FAILURES, isFlowchartPass } from '@oj2/contract'
-import { habitSituation, logMascotEvent, refreshMascotProfile, requestSpeech, spokenSpeechKeys } from 'shared/mascot/behavior'
+import { habitSituation, isPendingDaily, logMascotEvent, reactMascot, refreshMascotProfile, requestSpeech, spokenSpeechKeys } from 'shared/mascot/behavior'
 import { lintCode, type LintIssue, type LintRule } from '../utils/codeLint'
 import { useChallengeStore } from 'oj/store/challenge'
 import { useFlowchartStore } from 'oj/store/flowchart'
@@ -55,6 +55,11 @@ const LINT_SITUATION: Record<Exclude<LintRule, 'punct'>, MascotSituation> = {
   unclosedBracket: 'lint.unclosedBracket',
   unclosedQuote: 'lint.unclosedQuote',
 }
+
+/** 连着敲了这么久代码（两次改动隔不到 TYPING_GAP_MS 算连着），她给加个油；加完隔 CHEER_COOLDOWN_MS 才有下一次 */
+const TYPING_STREAK_MS = 60_000
+const TYPING_GAP_MS = 8000
+const CHEER_COOLDOWN_MS = 5 * 60_000
 
 /** 停手这么久还有常见的错，她就说 */
 const LINT_PAUSE_MS = 2000
@@ -294,6 +299,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
   let lastActivity = Date.now()
   /** 交这一次之前这道题做对过没有：没做对过的，这次做对就攒了一条小鱼干 */
   let solvedBeforeSubmit = false
+  /** 交这一次的时候，这道是不是她今天挑的、还没做对的那道（判完 profile 会刷新，得先记下） */
+  let dailyPending = false
 
   watch(
     () => problemStore.problem?.id,
@@ -335,6 +342,7 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
       sampledSinceSubmit = false
       lastActivity = Date.now()
       solvedBeforeSubmit = problemStore.problem?.myStatus === SubmissionStatus.accepted
+      dailyPending = !!problemStore.problem && isPendingDaily(problemStore.problem._id)
     },
   )
 
@@ -365,6 +373,8 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
 
   /** 做对了说哪一组：新攒了小鱼干的多半说这个，不然看是不是全班第一个、一次就过、磨了好几次 */
   function acceptedSituation(problemId: string): MascotSituation {
+    // 她今天挑的那道做对了：说好的多给两条
+    if (dailyPending) return 'daily.solved'
     if (!solvedBeforeSubmit && roll(CHANCE.fish)) return 'problem.acceptedFish'
     const lesson = lessonStore.find(problemId)
     if (lesson && lesson.acceptedCount <= (lesson.myStatus === 'accepted' ? 1 : 0)) return 'class.firstSolver'
@@ -407,6 +417,46 @@ export function useProblemMascotGuide(showResult: (segment: ResultSegment) => vo
     },
     { debounce: LINT_PAUSE_MS },
   )
+
+  // ---- 不说话的小动作：跑例子时凑过来看，判题时紧张，敲了好一阵代码加个油 ----
+  watch(
+    () => submissionStore.trial.samplesRunning.value,
+    (running, was) => {
+      if (!student()) return
+      if (running) return reactMascot('curious')
+      if (!was) return
+      const runs = submissionStore.trial.sampleRuns.value
+      const passed = runs.length > 0 && runs.every((run) => run.result === SubmissionStatus.accepted)
+      reactMascot(passed ? 'yes' : 'sweat', 2500)
+    },
+  )
+  watch(
+    () => submissionStore.judging || submissionStore.pending,
+    (busy, was) => {
+      if (!student()) return
+      if (busy) return reactMascot('fluster')
+      if (!was) return
+      // 做对了有欢呼（上面 priority 那句），这里只管收起；没做对难过一下
+      const failed = RESULT_SITUATION[submissionStore.submission?.result as SubmissionStatus]
+      reactMascot(failed ? 'sad' : null, 2500)
+    },
+  )
+  let streakStart = 0
+  let lastTyped = 0
+  let cheeredAt = -Infinity
+  watch(
+    () => codeStore.code.value,
+    () => {
+      const now = Date.now()
+      if (now - lastTyped > TYPING_GAP_MS) streakStart = now
+      lastTyped = now
+      if (!student() || now - streakStart < TYPING_STREAK_MS || now - cheeredAt < CHEER_COOLDOWN_MS) return
+      cheeredAt = now
+      streakStart = now
+      reactMascot('cheer', 3000)
+    },
+  )
+  onScopeDispose(() => reactMascot(null))
 
   // 盯着一道没做对的题 15 分钟，没交也没跑：问一句
   useIntervalFn(() => {

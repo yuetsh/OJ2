@@ -9,6 +9,7 @@ import type { Profile } from 'utils/types'
 import AchievementCard from './components/AchievementCard.vue'
 import KnowledgeMap from './components/KnowledgeMap.vue'
 import MascotCard from './components/MascotCard.vue'
+import MascotVisitCard from './components/MascotVisitCard.vue'
 import ProfileCard from './components/ProfileCard.vue'
 import SolvedCard from './components/SolvedCard.vue'
 import VersusCard from './components/VersusCard.vue'
@@ -76,6 +77,7 @@ useMascotGuide(() => {
             <KnowledgeMap v-if="overview.knowledge" :map="overview.knowledge" :teacher="teacherView" />
             <AchievementCard :achievements="overview.achievements" :username="profile.user.username" :other="!isSelf" />
             <MascotCard v-if="isSelf && !userStore.isTeacherOrAbove" />
+            <MascotVisitCard v-else-if="!isSelf" :username="profile.user.username" />
             <VersusCard v-if="overview.versus" :versus="overview.versus" :theirs="overview.solved.length" />
           </div>
         </div>

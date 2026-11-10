@@ -3,6 +3,7 @@ import api from 'utils/api'
 import { useUserStore } from 'shared/store/user'
 import type { MascotGuide } from './guide'
 import type { MascotSituation } from './lines'
+import type { MascotPose } from './poses'
 
 /**
  * 看板娘按学生的行为挑话：常犯哪类错、今天做了几道、和她熟不熟。数从 GET /mascot/profile 来，
@@ -197,6 +198,9 @@ export function noteMemorySaid(situation: MascotSituation) {
   if (situation.startsWith('memory.')) memorySaid.add(situation)
 }
 
+/** 连着来到第几天才说 */
+const STREAK_MIN = 3
+
 function whenText(days: number) {
   return days === 1 ? '昨天' : days === 2 ? '前天' : '前几天'
 }
@@ -212,6 +216,9 @@ function memoryGuide(profile: MascotProfile): Pick<MascotGuide, 'situation' | 'v
   }
   if (memory.patDaysAgo !== null && !memorySaid.has('memory.pat')) {
     return { situation: 'memory.pat', vars: { when: whenText(memory.patDaysAgo) } }
+  }
+  if (memory.streakDays >= STREAK_MIN && !memory.streakSaidToday && !memorySaid.has('memory.streak')) {
+    return { situation: 'memory.streak', vars: { n: memory.streakDays } }
   }
   return null
 }
@@ -285,4 +292,39 @@ export const spokenSpeechKeys = new Set<string>()
 export const speechRequest = shallowRef<MascotSpeech | null>(null)
 export function requestSpeech(speech: MascotSpeech) {
   speechRequest.value = speech
+}
+
+// ---- 每天一道 ----
+
+/** 这一页会话里提过今天的题没有（一天提一次就够，刷新页面会再提一次） */
+let dailyOfferedFor: string | null = null
+
+/** 今天挑的题还没做对、这一页还没提过：给出题号，同时记下「提过了」；不该提就是 null */
+export function takeDailyOffer() {
+  const daily = mascotProfile.value?.daily
+  if (!daily || daily.done || dailyOfferedFor === daily.problemId) return null
+  dailyOfferedFor = daily.problemId
+  return daily.problemId
+}
+
+/** 这道题是不是她今天挑的、还没做对的那道（做对时说多给鱼的那句） */
+export function isPendingDaily(problemId: string) {
+  const daily = mascotProfile.value?.daily
+  return !!daily && !daily.done && daily.problemId === problemId
+}
+
+// ---- 不说话的小动作 ----
+
+/**
+ * 页面让她摆一会儿的表情（不说话）：跑例子时凑过来看、判题时紧张、敲了好一阵代码给加个油。
+ * 只在她闲着的时候摆：说着话、生着闷气、睡着了都不换（Mascot.vue 的 pose）
+ */
+export const mascotReaction = shallowRef<MascotPose | null>(null)
+let reactionTimer: ReturnType<typeof setTimeout> | undefined
+
+/** 摆这个表情；给了 ms 就过这么久收起，不给就一直摆到下一次调用（传 null 收起） */
+export function reactMascot(pose: MascotPose | null, ms?: number) {
+  clearTimeout(reactionTimer)
+  mascotReaction.value = pose
+  if (pose && ms) reactionTimer = setTimeout(() => (mascotReaction.value = null), ms)
 }

@@ -23,6 +23,8 @@
  * - 指着说：题目页发来带 anchorY 的话（中文标点在第几行），她滑到屏幕右边那一行的高度探头说，
  *   气泡收了（说完、点了按钮、换页面）就滑回原处；这期间被拖走就留在拖到的地方。
  * - 做对了（题目页发来 priority 的话）：马上换高兴的图，等点评弹框关了再说，不受主动开口的频率上限管。
+ * - 小动作：页面经 behavior.ts 的 reactMascot 让她不说话地换个表情（题目页：跑例子时凑过来看、判题时紧张、
+ *   敲了好一阵代码给加个油），只在她闲着时摆。
  * - 摆弄：拖着一甩松手会飞出去，撞边回弹、落到底边晕一会儿；拎着来回摇会被摇晕；鼠标不按键在她身上
  *   来回蹭是挠痒；藏在屏幕边上被点到，说「被发现了」。
  * - 互动都记进 mascot_event（点开、点按钮、主动开口、摸头、嫌烦、被拖走）。
@@ -54,8 +56,10 @@ import {
   dressMascot,
   fishLeft,
   mascotOutfit,
+  mascotReaction,
   noteFed,
   speechRequest,
+  takeDailyOffer,
   spokenSpeechKeys,
   type MascotSpeech,
 } from 'shared/mascot/behavior'
@@ -595,6 +599,7 @@ function onUp() {
 // ---- 气泡 ----
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const collabStore = useCollabStore()
 const authModal = useAuthModalStore()
@@ -635,7 +640,15 @@ function toggleBubble() {
   if (silent.value) return
   let guide = resolveGuide()
   if (!userStore.isTeacherOrAbove) guide = personalize(guide)
-  const serious = SERIOUS.has(guide.situation)
+  let serious = SERIOUS.has(guide.situation)
+  // 今天挑的题：不在题目页（那里说的是手上这道题的事）、没有要紧事时，这一页头一次点她就提
+  if (!serious && isStudent.value && !route.path.startsWith('/problem/') && !napping.value && !sulking.value) {
+    const offer = dailyOffer()
+    if (offer) {
+      guide = offer
+      serious = true // 不拿彩蛋、越点越烦换掉
+    }
+  }
   if (napping.value) {
     napping.value = false
     // 睡着了被点醒：先说这一句，再点才说正事。要紧的事（有人举手、卡住了）直接说
@@ -1005,8 +1018,24 @@ useIntervalFn(() => {
   chat()
 }, 10_000)
 
+/** 今天挑的题那句和「去做」按钮；今天提过了、做对了、没挑出来就是 null */
+function dailyOffer(): MascotGuide | null {
+  const pid = takeDailyOffer()
+  return pid ? { situation: 'daily.offer', vars: { pid }, actions: [{ label: '去做', run: () => router.push(`/problem/${pid}`) }] } : null
+}
+
 function chat() {
   const profile = mascotProfile.value
+  // 闲聊的时候也可能提今天的题（不在题目页、没睡着）
+  if (!napping.value && !route.path.startsWith('/problem/') && Math.random() < 0.4) {
+    const offer = dailyOffer()
+    if (offer) {
+      const text = fillLine(pick(offer.situation), offer)
+      say({ text, actions: offer.actions, situation: offer.situation, pose: situationPose(offer.situation) }, SPOKEN_BUBBLE_MS)
+      logMascotEvent({ kind: 'speak', situation: offer.situation, line: text })
+      return
+    }
+  }
   const next = chooseChat({
     idlePose: idlePose.value,
     napping: napping.value,
@@ -1086,6 +1115,8 @@ const pose = computed<MascotPose>(() => {
   if (fishNear.value || wardrobeOpen.value) return 'excited'
   if (bubble.value?.pose) return bubble.value.pose
   if (sulking.value) return 'fuming'
+  // 页面让摆的小动作（跑例子、判题、敲代码）：睡着了不理
+  if (mascotReaction.value && !napping.value) return mascotReaction.value
   return idlePose.value ?? restPose.value
 })
 

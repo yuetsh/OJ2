@@ -274,6 +274,9 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'feed.forgive': ['blush', 'touched'],
   'feed.wake': ['stretch'],
   'problem.acceptedFish': ['happy', 'cheer', 'excited'],
+  'daily.offer': ['idea', 'wink'],
+  'daily.solved': ['happy', 'thumbs'],
+  'memory.streak': ['blush', 'wink'],
   // 抓到中文标点
   'problem.chinesePunct': ['lecture'],
   'problem.chinesePuncts': ['lecture'],

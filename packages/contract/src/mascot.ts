@@ -15,6 +15,8 @@ import { z } from 'zod'
  *   见过的不再记，所以一人一个姿势至多一条，主页「见过她的样子」按它数
  * - `dress`：拿小鱼干给她换了一身衣服（action = 衣服，见 MASCOT_OUTFITS；`none` 是换回平时那身，不花鱼）。
  *   当天（东八区）最后一次换的那身就是她今天穿的
+ * - `daily`：她今天给这个学生挑的题（action = 题目 id）。**只有后端写**（第一次拉 profile 时挑好记下），
+ *   前台发来的不收；当天做对这道多给 MASCOT_DAILY_BONUS 条小鱼干，按它算
  * - `feed`：喂了她一条小鱼干（line 是她说的那句）。小鱼干做对新题攒，喂一条记一条，剩几条按这个算（见 mascotProfileSchema.fish）
  *
  * 另外两种不是对她做的，是她要看的行为，别处没有存：
@@ -25,7 +27,22 @@ import { z } from 'zod'
  *
  * 不记代码、不记按键。
  */
-export const MASCOT_EVENT_KINDS = ['open', 'action', 'speak', 'pat', 'overclick', 'move', 'play', 'answer', 'feed', 'pose', 'dress', 'trial', 'help'] as const
+export const MASCOT_EVENT_KINDS = [
+  'open',
+  'action',
+  'speak',
+  'pat',
+  'overclick',
+  'move',
+  'play',
+  'answer',
+  'feed',
+  'pose',
+  'dress',
+  'daily',
+  'trial',
+  'help',
+] as const
 /** 这几种的 line 是她说出口的话，算进台词收集 */
 export const MASCOT_SPOKEN_KINDS = ['open', 'speak', 'pat', 'overclick', 'play', 'feed'] as const satisfies readonly (typeof MASCOT_EVENT_KINDS)[number][]
 export const mascotEventKindSchema = z.enum(MASCOT_EVENT_KINDS)
@@ -46,6 +63,8 @@ export const MASCOT_FISH_GIFT = 3
 /** 拿小鱼干能给她换的衣服（就是姿势名，图在前台 assets/mascot/），换一身要几条；穿到当天结束 */
 export const MASCOT_OUTFITS = ['festival-spring', 'festival-mid-autumn', 'festival-christmas', 'festival-halloween', 'festival-valentine', 'pajama'] as const
 export const MASCOT_OUTFIT_COST = 5
+/** 她每天挑的那道题，当天做对多给几条小鱼干（做对新题本来的那一条照给） */
+export const MASCOT_DAILY_BONUS = 2
 /** dress 事件的 action 写这个是换回平时那身 */
 export const MASCOT_OUTFIT_NONE = 'none'
 /** 从这一天（东八区）起第一次做对的题才攒小鱼干，以前做对的不算 */
@@ -89,10 +108,14 @@ export const mascotProfileSchema = z.object({
     solvedBeforeToday: z.number().int(),
     /** 今天说过「熟了一点」（memory.closer）没有 */
     closerSaidToday: z.boolean(),
+    /** 连着第几天来找她（今天算一天；昨天没来就是 1） */
+    streakDays: z.number().int(),
+    /** 今天说过「连续第 N 天」（memory.streak）没有 */
+    streakSaidToday: z.boolean(),
   }),
   /**
    * 小鱼干：上线时每人先送 MASCOT_FISH_GIFT 条，之后每做对一道**新**题（第一次做对的时刻在 MASCOT_FISH_SINCE 之后，
-   * 含比赛题）攒一条；喂一条用一条（fed），换一身衣服用 MASCOT_OUTFIT_COST 条（spent）。
+   * 含比赛题）攒一条，她每天挑的题当天做对再加 MASCOT_DAILY_BONUS 条（都算在 earned 里）；喂一条用一条（fed），换一身衣服用 MASCOT_OUTFIT_COST 条（spent）。
    * 剩几条 = 送的 + earned - fed - spent，前台算
    */
   fish: z.object({
@@ -100,6 +123,8 @@ export const mascotProfileSchema = z.object({
     fed: z.number().int(),
     spent: z.number().int(),
   }),
+  /** 她今天给挑的题（题号是给学生看的那个）和今天做对没有；挑不出（都做完了）是 null */
+  daily: z.object({ problemId: z.string(), done: z.boolean() }).nullable(),
   /** 她今天穿的衣服（MASCOT_OUTFITS 之一），没换、换回来了是 null */
   outfit: z.string().nullable(),
   /** 见过她哪些样子（姿势名）：前台换上没见过的图才记一条 pose */
@@ -164,3 +189,16 @@ export const mascotJournalSchema = z.object({
   poses: z.array(z.string()),
 })
 export type MascotJournal = z.infer<typeof mascotJournalSchema>
+
+/**
+ * 去同学主页串门时看到的（GET /mascot/of/:username）：对方的小鲸鱼今天穿着什么、认识多久、见过几个样子。
+ * 只有这几样，互动次数、听过的话是对方自己的事，不给别人看。对方不是学生、从没碰过她，firstAt 是 null
+ */
+export const mascotVisitSchema = z.object({
+  firstAt: z.string().nullable(),
+  /** 今天穿的衣服（MASCOT_OUTFITS 之一），没换是 null */
+  outfit: z.string().nullable(),
+  /** 见过她几个样子 */
+  poses: z.number().int(),
+})
+export type MascotVisit = z.infer<typeof mascotVisitSchema>
