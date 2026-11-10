@@ -401,11 +401,11 @@ onMounted(load)
         <span class="label">布置</span>
         <div class="stack">
           <n-flex :size="6" align="center">
-            <button class="chip" :class="{ on: choice === 'none' }" @click="choice = 'none'">不布置</button>
-            <button v-for="c in CHOICES" :key="c.days" class="chip" :class="{ on: choice === c.days }" @click="choice = c.days">
-              {{ c.label }}
-            </button>
-            <button class="chip" :class="{ on: choice === 'pick' }" @click="choice = 'pick'">选日期…</button>
+            <n-radio-group v-model:value="choice">
+              <n-radio-button value="none">不布置</n-radio-button>
+              <n-radio-button v-for="c in CHOICES" :key="c.days" :value="c.days">{{ c.label }}</n-radio-button>
+              <n-radio-button value="pick">选日期…</n-radio-button>
+            </n-radio-group>
             <n-date-picker v-if="choice === 'pick'" v-model:value="picked" type="date" :is-date-disabled="disabledDate" style="width: 150px" />
           </n-flex>
           <span class="hint">{{ assignHint }}</span>
@@ -482,14 +482,9 @@ onMounted(load)
             <b class="num idx">{{ index + 1 }}</b>
             <span class="muted num tiny pid">{{ item.displayId }}</span>
             <span class="ell grow">{{ item.title }}</span>
-            <button
-              class="chip small"
-              :class="{ dashed: item.isRequired }"
-              :title="item.isRequired ? '点一下改成选做' : '点一下改回必做'"
-              @click="toggleRequired(item)"
-            >
+            <n-button size="tiny" round :dashed="item.isRequired" :title="item.isRequired ? '点一下改成选做' : '点一下改回必做'" @click="toggleRequired(item)">
               {{ item.isRequired ? '必做' : '选做' }}
-            </button>
+            </n-button>
             <n-button size="small" text :aria-label="`拿掉 ${item.title}`" @click="remove(item)">✕</n-button>
           </div>
         </div>
@@ -508,7 +503,7 @@ onMounted(load)
           <div v-for="badge in badges" :key="badge.id" class="item badge">
             <img :src="badge.icon" alt="" class="badge-icon" />
             <b class="ell badge-name">{{ badge.name }}</b>
-            <span class="chip small static">{{ badgeCondition(badge) }}</span>
+            <n-tag size="small" round>{{ badgeCondition(badge) }}</n-tag>
             <span class="muted ell grow tiny">{{ badge.description }}</span>
             <span class="muted num tiny">{{ badge.earnedCount }} 人拿到</span>
             <n-button size="small" @click="openBadge(badge)">改</n-button>
@@ -629,41 +624,6 @@ onMounted(load)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.chip {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
-  border: 1px solid v-bind('theme.borderColor');
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: v-bind('theme.textColor2');
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.chip.on {
-  border-color: v-bind('theme.primaryColor');
-  color: v-bind('theme.primaryColor');
-  font-weight: 600;
-}
-
-.chip.small {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.chip.dashed {
-  border-style: dashed;
-  color: v-bind('theme.textColor3');
-}
-
-.chip.static {
-  cursor: default;
 }
 
 .stats {

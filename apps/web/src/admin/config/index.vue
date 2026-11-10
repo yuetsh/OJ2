@@ -291,7 +291,7 @@ onMounted(() => {
     </h3>
     <n-empty v-if="!servers.length" description="一台都没有连上" />
     <div v-for="server in servers" :key="server.hostname" class="server">
-      <span class="dot" :class="server.status === 'normal' ? 'ok' : 'bad'"></span>
+      <n-badge dot :type="server.status === 'normal' ? 'success' : 'error'" />
       <b>{{ server.hostname }}</b>
       <span class="muted">
         {{ server.cpuCore }} 核 · CPU {{ server.cpuUsage }}% · 内存 {{ server.memoryUsage }}% · 版本
@@ -474,20 +474,6 @@ h3 {
 
 .server {
   font-size: 14px;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.dot.ok {
-  background: v-bind('theme.successColor');
-}
-
-.dot.bad {
-  background: v-bind('theme.errorColor');
 }
 
 .ok-text {

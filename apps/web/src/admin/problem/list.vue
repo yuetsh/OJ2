@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NSwitch, useThemeVars } from 'naive-ui'
+import { NA, NSwitch, useThemeVars } from 'naive-ui'
 import Pagination from 'shared/components/Pagination.vue'
 import { usePagination } from 'shared/composables/pagination'
 import { parseTime } from 'utils/functions'
@@ -128,9 +128,8 @@ function renderTitle(row: AdminProblemRow) {
   ]
   return h('span', { class: 'title-cell' }, [
     h(
-      'a',
+      NA,
       {
-        class: 'title-link',
         href: router.resolve(editRoute(row.id)).href,
         onClick: (event: MouseEvent) => {
           if (event.ctrlKey || event.metaKey || event.shiftKey) return
@@ -431,16 +430,6 @@ watch(() => [query.page, query.limit, query.author, query.kind, query.visible], 
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.problem-table :deep(.title-link) {
-  color: v-bind('theme.primaryColor');
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.problem-table :deep(.title-link:hover) {
-  text-decoration: underline;
 }
 
 .problem-table :deep(.tags) {

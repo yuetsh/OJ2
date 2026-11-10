@@ -250,9 +250,9 @@ onMounted(load)
                 <span class="c-last muted">最后学习</span>
               </div>
               <div v-for="row in started" :key="row.userId" class="line">
-                <button type="button" class="c-name name-btn" @click="openStudent(row)">
+                <n-button text type="primary" class="c-name" @click="openStudent(row)">
                   <UserName :username="row.username" />
-                </button>
+                </n-button>
                 <div class="cells">
                   <div v-for="group in groups" :key="group.tutorials[0]!.id" class="group-cells">
                     <span
@@ -559,21 +559,6 @@ onMounted(load)
 }
 .cell.stuck {
   box-shadow: inset 0 -4px 0 v-bind('theme.warningColor');
-}
-.name-btn {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.name-btn :deep(.name) {
-  color: v-bind('theme.primaryColor');
-}
-.name-btn:hover :deep(.name) {
-  text-decoration: underline;
 }
 .c-num {
   width: 44px;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageHeader from 'admin/components/PageHeader.vue'
-import { NSwitch, useThemeVars } from 'naive-ui'
-import { RouterLink } from 'vue-router'
+import { NA, NSwitch, useThemeVars } from 'naive-ui'
+import { useRouter } from 'vue-router'
 import Pagination from 'shared/components/Pagination.vue'
 import { parseTime } from 'utils/functions'
 import type { AdminAnnouncementListItem } from 'utils/types'
@@ -11,6 +11,7 @@ import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useListLoader } from 'shared/composables/listLoader'
 
 const message = useMessage()
+const router = useRouter()
 const total = ref(0)
 const query = reactive({
   limit: 10,
@@ -29,10 +30,14 @@ const { isMobile } = useBreakpoints()
 function renderTitle(row: AdminAnnouncementListItem) {
   return h('span', { class: 'title-cell' }, [
     h(
-      RouterLink,
+      NA,
       {
-        class: 'title-link',
-        to: { name: 'admin announcement edit', params: { announcementID: row.id } },
+        href: router.resolve({ name: 'admin announcement edit', params: { announcementID: row.id } }).href,
+        onClick: (event: MouseEvent) => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey) return
+          event.preventDefault()
+          router.push({ name: 'admin announcement edit', params: { announcementID: row.id } })
+        },
       },
       () => row.title,
     ),
@@ -186,16 +191,6 @@ watch(query, listAnnouncements, { deep: true })
 
 .ann-table :deep(.m-item) {
   white-space: nowrap;
-}
-
-.ann-table :deep(.title-link) {
-  color: v-bind('theme.primaryColor');
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.ann-table :deep(.title-link:hover) {
-  text-decoration: underline;
 }
 
 .ann-table :deep(.top) {

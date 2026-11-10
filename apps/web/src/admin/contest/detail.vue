@@ -81,6 +81,9 @@ const timeHint = computed(() => {
   return `${parseTime(start, 'M月D日')} 周${weekday} ${parseTime(start, 'HH:mm')} 开始，${parseTime(end, sameDay ? 'HH:mm' : 'M月D日 HH:mm')} 结束`
 })
 
+const waitChoice = computed(() => (waitMins.value === null ? 'pick' : waitMins.value))
+const durationChoice = computed(() => (customDuration.value ? 'custom' : durationMins.value))
+
 function pickWait(minutes: number | null) {
   if (minutes === null) pickedStart.value = toPickerValue(startMs.value)
   waitMins.value = minutes
@@ -321,8 +324,10 @@ onMounted(load)
         <div class="stack">
           <n-flex :size="6">
             <template v-if="!editing">
-              <button v-for="m in WAIT_CHOICES" :key="m" class="chip" :class="{ on: waitMins === m }" @click="pickWait(m)">{{ m }} 分钟后</button>
-              <button class="chip" :class="{ on: waitMins === null }" @click="pickWait(null)">选时间…</button>
+              <n-radio-group :value="waitChoice" @update:value="(v: number | 'pick') => pickWait(v === 'pick' ? null : v)">
+                <n-radio-button v-for="m in WAIT_CHOICES" :key="m" :value="m">{{ m }} 分钟后</n-radio-button>
+                <n-radio-button value="pick">选时间…</n-radio-button>
+              </n-radio-group>
             </template>
             <n-date-picker v-if="waitMins === null" v-model:value="pickedStart" type="datetime" format="yyyy-MM-dd HH:mm" style="width: 200px" />
           </n-flex>
@@ -333,10 +338,10 @@ onMounted(load)
         <span class="label">时长</span>
         <div class="stack">
           <n-flex :size="6" align="center">
-            <button v-for="m in DURATION_CHOICES" :key="m" class="chip" :class="{ on: !customDuration && durationMins === m }" @click="pickDuration(m)">
-              {{ m === 60 ? '1 小时' : `${m} 分钟` }}
-            </button>
-            <button class="chip" :class="{ on: customDuration }" @click="pickDuration(null)">自己填</button>
+            <n-radio-group :value="durationChoice" @update:value="(v: number | 'custom') => pickDuration(v === 'custom' ? null : v)">
+              <n-radio-button v-for="m in DURATION_CHOICES" :key="m" :value="m">{{ m === 60 ? '1 小时' : `${m} 分钟` }}</n-radio-button>
+              <n-radio-button value="custom">自己填</n-radio-button>
+            </n-radio-group>
             <n-input-number v-if="customDuration" v-model:value="durationMins" :min="1" :step="5" style="width: 130px">
               <template #suffix>分钟</template>
             </n-input-number>
@@ -508,24 +513,6 @@ onMounted(load)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.chip {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: 14px;
-  border: 1px solid v-bind('theme.borderColor');
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  color: v-bind('theme.textColor2');
-  cursor: pointer;
-}
-
-.chip.on {
-  border-color: v-bind('theme.primaryColor');
-  color: v-bind('theme.primaryColor');
-  font-weight: 600;
 }
 
 .save {

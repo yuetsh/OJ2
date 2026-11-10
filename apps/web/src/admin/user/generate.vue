@@ -248,7 +248,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
         </div>
 
         <div class="preview">
-          <table>
+          <n-table size="small" :bordered="false" striped>
             <thead>
               <tr>
                 <th></th>
@@ -263,7 +263,7 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
                 <td class="mono">{{ row.password }}</td>
               </tr>
             </tbody>
-          </table>
+          </n-table>
         </div>
 
         <div>
@@ -342,35 +342,10 @@ body{margin:12mm;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
 .preview {
   max-height: 520px;
   overflow: auto;
-  border: 1px solid rgba(128, 128, 128, 0.2);
-  border-radius: 8px;
-  padding: 4px 12px;
-}
-
-.preview table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 14px;
-}
-
-.preview th {
-  font-weight: 400;
-  font-size: 13px;
-  opacity: 0.6;
-  text-align: left;
-  padding: 8px;
-}
-
-.preview td {
-  height: 38px;
-  padding: 0 8px;
-  border-top: 1px solid rgba(128, 128, 128, 0.12);
-  white-space: nowrap;
 }
 
 .preview .n {
   width: 32px;
-  opacity: 0.5;
   font-variant-numeric: tabular-nums;
 }
 

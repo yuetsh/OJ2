@@ -306,9 +306,6 @@ html.dark .page {
 a.c-title .ptitle {
   color: var(--learn-green-text);
 }
-a.c-title:hover .ptitle {
-  text-decoration: underline;
-}
 .pid {
   width: 34px;
   flex-shrink: 0;

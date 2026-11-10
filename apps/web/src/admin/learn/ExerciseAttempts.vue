@@ -90,7 +90,7 @@ onMounted(async () => {
       <n-text depth="3">{{ untried.length }} 人</n-text>
     </div>
     <div class="chips">
-      <span v-for="row in untried" :key="row.userId" class="chip"><UserName :username="row.username" /></span>
+      <n-tag v-for="row in untried" :key="row.userId" round size="small"><UserName :username="row.username" /></n-tag>
     </div>
   </div>
 </template>
@@ -112,15 +112,6 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.chip {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid rgba(128, 128, 128, 0.25);
-  border-radius: 13px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
 }
 :deep(.m-row) {
   display: flex;

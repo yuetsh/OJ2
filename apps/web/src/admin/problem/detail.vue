@@ -876,20 +876,12 @@ onMounted(async () => {
           <div class="tagRow">
             <span class="label tagLabel">知识点</span>
             <div class="chips">
-              <button
-                v-for="name in visibleKnowledge"
-                :key="name"
-                type="button"
-                class="chip"
-                :class="{ on: form.tags.includes(name) }"
-                :aria-pressed="form.tags.includes(name)"
-                @click="toggleKnowledge(name)"
-              >
+              <n-checkable-tag v-for="name in visibleKnowledge" :key="name" :checked="form.tags.includes(name)" @update:checked="toggleKnowledge(name)">
                 {{ name }}
-              </button>
-              <button v-if="knowledgeTags.length > 10" type="button" class="chip more" @click="showAllKnowledge = !showAllKnowledge">
+              </n-checkable-tag>
+              <n-button v-if="knowledgeTags.length > 10" size="tiny" quaternary @click="showAllKnowledge = !showAllKnowledge">
                 {{ showAllKnowledge ? '收起' : `更多 ${knowledgeTags.length - 10} 个 ▾` }}
-              </button>
+              </n-button>
             </div>
           </div>
           <div class="tagRow">
@@ -1408,29 +1400,6 @@ onMounted(async () => {
   gap: 6px;
 }
 
-.chip {
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 3px;
-  border: 1px solid v-bind('theme.borderColor');
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: v-bind('theme.textColor2');
-  cursor: pointer;
-}
-
-.chip.on {
-  border-color: rgba(24, 160, 88, 0.5);
-  background-color: rgba(24, 160, 88, 0.12);
-  color: v-bind('theme.primaryColorPressed');
-  font-weight: 600;
-}
-
-.chip.more {
-  color: v-bind('theme.textColor3');
-}
-
 .empty {
   padding: 14px 10px;
   text-align: center;
@@ -1530,10 +1499,6 @@ onMounted(async () => {
 
 .blocker.severe {
   color: v-bind('theme.errorColor');
-}
-
-.blocker:hover {
-  text-decoration: underline;
 }
 
 .flowCanvas {

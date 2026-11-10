@@ -142,10 +142,8 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
             <n-button size="small" @click="cancelEdit">取消</n-button>
           </template>
           <template v-else>
-            <button type="button" class="name" :title="tag.name" @click="openTagProblems(tag)">
-              {{ tag.name }}
-            </button>
-            <span class="bar"><i :style="{ width: `${(tag.problemCount / col.max) * 100}%` }"></i></span>
+            <n-button text type="primary" class="name" :title="tag.name" @click="openTagProblems(tag)">{{ tag.name }}</n-button>
+            <n-progress class="bar" type="line" :percentage="(tag.problemCount / col.max) * 100" :show-indicator="false" :height="6" />
             <span class="count">{{ tag.problemCount }} 道</span>
             <n-button size="tiny" quaternary @click="startEdit(tag)">改名</n-button>
             <n-button size="tiny" quaternary @click="changeCategory(tag, tag.category === 'theme' ? 'knowledge' : 'theme')">
@@ -229,33 +227,12 @@ watchDebounced(keyword, listTags, { debounce: 500, maxWait: 1000 })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
   font-size: 15px;
-  text-align: left;
-  color: v-bind('theme.primaryColor');
-  cursor: pointer;
-}
-
-.name:hover {
-  text-decoration: underline;
+  justify-content: flex-start;
 }
 
 .bar {
   flex: 1 1 auto;
-  height: 6px;
-  border-radius: 3px;
-  background: v-bind('theme.actionColor');
-  overflow: hidden;
-}
-
-.bar i {
-  display: block;
-  height: 6px;
-  border-radius: 3px;
-  background: v-bind('theme.successColorSuppl');
 }
 
 .count {
