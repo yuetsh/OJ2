@@ -19,7 +19,7 @@
  *   带按钮回答。正在敲键盘、刚冒过气泡、比赛里都不说；睡着了说梦话，不醒。
  * - 小鱼干：学生做对新题攒（behavior.ts 的 fishLeft），脚边一个小牌子写着几条，拖到她身上就喂了，
  *   两分钟喂到 FULL_AFTER 条就饱了、一会儿再喂；生闷气时喂一条就哄好了，睡着了喂醒。
- * - 衣柜：点一下小鱼干牌子打开，拿 MASCOT_OUTFIT_COST 条换一身（节日装、睡衣），穿到当天结束；换回平时那身不花鱼。
+ * - 衣柜：点一下小鱼干牌子打开，拿小鱼干换一身（MASCOT_OUTFIT_COSTS：节日装 5 条、日常装 3 条），穿到当天结束；换回平时那身不花鱼。
  * - 指着说：题目页发来带 anchorY 的话（中文标点在第几行），她滑到屏幕右边那一行的高度探头说，
  *   气泡收了（说完、点了按钮、换页面）就滑回原处；这期间被拖走就留在拖到的地方。
  * - 做对了（题目页发来 priority 的话）：马上换高兴的图，等点评弹框关了再说，不受主动开口的频率上限管。
@@ -41,7 +41,7 @@
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import { dailyPose, festivalPose, napPose, PEEK_SIZE, pick as pickOne, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
 import { MASCOT_LINES, type MascotSituation } from 'shared/mascot/lines'
-import { MASCOT_OUTFIT_COST, MASCOT_OUTFITS } from '@oj2/contract'
+import { MASCOT_OUTFIT_COSTS, MASCOT_OUTFITS, type MascotOutfit } from '@oj2/contract'
 import { chooseChat, type MascotQuestion } from 'shared/mascot/chat'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import {
@@ -53,6 +53,7 @@ import {
   notePoke,
   personalize,
   refreshMascotProfile,
+  collectReward,
   dressMascot,
   fishLeft,
   mascotOutfit,
@@ -931,11 +932,19 @@ function onFishUp(e: PointerEvent) {
 // ---- 衣柜：拿小鱼干给她换衣服 ----
 const wardrobeOpen = ref(false)
 const wardrobeEl = ref<HTMLElement>()
+/** 她靠上时衣柜往下展开（13 格有 4 行，往上会顶出屏幕） */
+const wardrobeBelow = computed(() => pos.y < 440)
 const outfits = computed(() => {
   const worn = mascotOutfit.value
   return [
-    { outfit: null, url: poseUrl('idle'), worn: !worn, affordable: true },
-    ...MASCOT_OUTFITS.map((outfit) => ({ outfit, url: poseUrl(outfit), worn: worn === outfit, affordable: fishLeft.value >= MASCOT_OUTFIT_COST })),
+    { outfit: null, url: poseUrl('idle'), cost: 0, worn: !worn, affordable: true },
+    ...MASCOT_OUTFITS.map((outfit) => ({
+      outfit,
+      url: poseUrl(outfit),
+      cost: MASCOT_OUTFIT_COSTS[outfit],
+      worn: worn === outfit,
+      affordable: fishLeft.value >= MASCOT_OUTFIT_COSTS[outfit],
+    })),
   ]
 })
 
@@ -949,8 +958,8 @@ function toggleWardrobe() {
 }
 
 /** 换上一身（null 是换回平时那身）。穿的那身由 restPose 接上，说话时不换图 */
-function dress(outfit: string | null) {
-  if (outfit && fishLeft.value < MASCOT_OUTFIT_COST) return
+function dress(outfit: MascotOutfit | null) {
+  if (outfit && fishLeft.value < MASCOT_OUTFIT_COSTS[outfit]) return
   wardrobeOpen.value = false
   touched()
   idlePose.value = null
@@ -999,6 +1008,22 @@ function feed() {
   clearTimeout(munchTimer)
   munchTimer = setTimeout(() => (munching.value = false), 1200)
 }
+
+// 图鉴集到新的一档：说一句（不用等，但别压在别的话上头；比赛里不说）
+watch(collectReward, (n) => {
+  if (!n) return
+  const wait = setInterval(() => {
+    if (silent.value || bubble.value || dragging.value || flying.value || document.querySelector('.n-modal-mask')) return
+    clearInterval(wait)
+    const k = collectReward.value
+    collectReward.value = 0
+    if (!k) return
+    const text = fillLine(pick('collect.reward'), { n: k })
+    say({ text, situation: 'collect.reward', pose: situationPose('collect.reward') }, SPOKEN_BUBBLE_MS)
+    logMascotEvent({ kind: 'speak', situation: 'collect.reward', line: text })
+  }, 500)
+  setTimeout(() => clearInterval(wait), 120_000)
+})
 
 // ---- 闲聊：没人理她，隔几分钟自己说一句（只对学生）----
 let nextChatAt = performance.now() + CHAT_FIRST_MS
@@ -1196,7 +1221,8 @@ watch(
     // 还没拉到这个人见过哪些就先不记，拉到了这个 watch 会再跑一遍
     if (!known || !isStudent.value || known.includes(shown) || posesLogged.has(shown)) return
     posesLogged.add(shown)
-    logMascotEvent({ kind: 'pose', action: shown })
+    // 记完拉一遍：见过的样子到了新的一档，后端会多送小鱼干
+    void logMascotEvent({ kind: 'pose', action: shown }).then(() => refreshMascotProfile(true))
   },
   { immediate: true },
 )
@@ -1273,7 +1299,7 @@ onBeforeUnmount(() => {
       <svg class="fish-icon" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>
       <span>{{ fishLeft }}</span>
     </div>
-    <div v-if="wardrobeOpen && showFish" ref="wardrobeEl" class="wardrobe" :class="{ left: !flipped }">
+    <div v-if="wardrobeOpen && showFish" ref="wardrobeEl" class="wardrobe" :class="{ left: !flipped, below: wardrobeBelow }">
       <button
         v-for="it in outfits"
         :key="it.outfit ?? 'none'"
@@ -1287,7 +1313,7 @@ onBeforeUnmount(() => {
         <span v-if="it.worn" class="price">穿着</span>
         <span v-else-if="!it.outfit" class="price">平时</span>
         <span v-else class="price"
-          ><svg class="price-fish" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>{{ MASCOT_OUTFIT_COST }}</span
+          ><svg class="price-fish" viewBox="0 0 32 18" aria-hidden="true"><use href="#oj-mascot-fish" /></svg>{{ it.cost }}</span
         >
       </button>
     </div>
@@ -1561,7 +1587,7 @@ html.dark .fish {
   height: 22px;
   pointer-events: none;
 }
-/* 衣柜：小鱼干牌子上面，和牌子同一侧 */
+/* 衣柜：小鱼干牌子上面，和牌子同一侧；她在屏幕上半部时改到她下面 */
 .wardrobe {
   position: absolute;
   bottom: 52px;
@@ -1579,6 +1605,10 @@ html.dark .fish {
 .wardrobe.left {
   left: auto;
   right: calc(100% - 6px);
+}
+.wardrobe.below {
+  bottom: auto;
+  top: calc(100% + 6px);
 }
 html.dark .wardrobe {
   border-color: #7f94d4;

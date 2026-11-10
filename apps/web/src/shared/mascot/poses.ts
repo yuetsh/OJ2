@@ -274,6 +274,7 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'feed.forgive': ['blush', 'touched'],
   'feed.wake': ['stretch'],
   'problem.acceptedFish': ['happy', 'cheer', 'excited'],
+  'collect.reward': ['happy', 'wink', 'star'],
   'daily.offer': ['idea', 'wink'],
   'daily.solved': ['happy', 'thumbs'],
   'memory.streak': ['blush', 'wink'],

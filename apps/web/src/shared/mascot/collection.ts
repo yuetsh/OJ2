@@ -45,7 +45,7 @@ const GROUPS: Group[] = [
   },
   { name: '被惹烦了', test: prefix('pester', 'sulk', 'overclick') },
   { name: '被摆弄', test: prefix('patting', 'play', 'peek') },
-  { name: '小鱼干', test: prefix('feed', 'dress', 'daily') },
+  { name: '小鱼干', test: prefix('feed', 'dress', 'daily', 'collect') },
   { name: '熟了以后', test: prefix('affinity', 'memory') },
   { name: '稀有', test: prefix('rare') },
 ]

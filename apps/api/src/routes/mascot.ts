@@ -2,7 +2,8 @@ import {
   MASCOT_DAILY_BONUS,
   MASCOT_FISH_GIFT,
   MASCOT_FISH_SINCE,
-  MASCOT_OUTFIT_COST,
+  MASCOT_COLLECT_REWARDS,
+  MASCOT_OUTFIT_COSTS,
   MASCOT_OUTFIT_NONE,
   MASCOT_OUTFITS,
   MASCOT_SPOKEN_KINDS,
@@ -64,7 +65,7 @@ async function canDress(userId: number, outfit: string | undefined) {
   if (outfit === MASCOT_OUTFIT_NONE) return true
   if (!outfit || !(MASCOT_OUTFITS as readonly string[]).includes(outfit)) return false
   const fish = await fishOf(userId)
-  return MASCOT_FISH_GIFT + fish.earned - fish.fed - fish.spent >= MASCOT_OUTFIT_COST
+  return MASCOT_FISH_GIFT + fish.earned - fish.fed - fish.spent >= MASCOT_OUTFIT_COSTS[outfit as keyof typeof MASCOT_OUTFIT_COSTS]
 }
 
 /** 算「来找过她」的事：对她做的，不含跑例子、举手、后端自己记的 */
@@ -147,7 +148,7 @@ async function fishOf(userId: number) {
   const s = schema.submission
   const e = schema.mascotEvent
   const since = localDateTime(MASCOT_FISH_SINCE, '00:00')
-  const [row] = await db.execute<{ earned: number; fed: number; spent: number }>(sql`
+  const [row] = await db.execute<{ earned: number; fed: number; poses_n: number; lines_n: number }>(sql`
     select
       (
         select count(*)::int from (
@@ -171,12 +172,22 @@ async function fishOf(userId: number) {
         )
       ) as earned,
       (select count(*)::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'feed') as fed,
+      (select count(distinct ${e.action})::int from ${e} where ${e.userId} = ${userId} and ${e.kind} = 'pose') as poses_n,
       (
-        select count(*)::int * ${MASCOT_OUTFIT_COST} from ${e}
-        where ${e.userId} = ${userId} and ${e.kind} = 'dress' and ${e.action} <> ${MASCOT_OUTFIT_NONE}
-      ) as spent
+        select count(distinct ${e.line})::int from ${e}
+        where ${e.userId} = ${userId} and ${e.kind} in ('open', 'speak', 'pat', 'overclick', 'play', 'feed') and ${e.line} is not null
+      ) as lines_n
   `)
-  return { earned: row?.earned ?? 0, fed: row?.fed ?? 0, spent: row?.spent ?? 0 }
+  // 换衣服花的鱼：每身的价不一样，按买过的次数一身身加
+  const dressed = await db
+    .select({ outfit: e.action, n: count() })
+    .from(e)
+    .where(and(eq(e.userId, userId), eq(e.kind, 'dress'), sql`${e.action} <> ${MASCOT_OUTFIT_NONE}`))
+    .groupBy(e.action)
+  const spent = dressed.reduce((sum, it) => sum + it.n * (MASCOT_OUTFIT_COSTS[it.outfit as keyof typeof MASCOT_OUTFIT_COSTS] ?? 0), 0)
+  const reached = (table: readonly (readonly [number, number])[], n: number) => table.reduce((sum, [at, bonus]) => sum + (n >= at ? bonus : 0), 0)
+  const collect = reached(MASCOT_COLLECT_REWARDS.poses, row?.poses_n ?? 0) + reached(MASCOT_COLLECT_REWARDS.lines, row?.lines_n ?? 0)
+  return { earned: (row?.earned ?? 0) + collect, fed: row?.fed ?? 0, spent, collect }
 }
 
 /** 她今天穿的衣服：今天（东八区）最后一次 dress，换回来了（none）就是 null */

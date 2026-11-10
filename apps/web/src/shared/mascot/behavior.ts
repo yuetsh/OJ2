@@ -1,4 +1,4 @@
-import { MASCOT_FISH_GIFT, MASCOT_OUTFIT_COST, MASCOT_OUTFIT_NONE, type MascotEventInput, type MascotProfile } from '@oj2/contract'
+import { MASCOT_FISH_GIFT, MASCOT_OUTFIT_COSTS, MASCOT_OUTFIT_NONE, type MascotEventInput, type MascotOutfit, type MascotProfile } from '@oj2/contract'
 import api from 'utils/api'
 import { useUserStore } from 'shared/store/user'
 import type { MascotGuide } from './guide'
@@ -47,6 +47,7 @@ export function refreshMascotProfile(force = false) {
         usedLocally.value = 0
         outfitWorn.value = undefined
       }
+      noteCollectReward(userId, profile.fish.collect)
       mascotProfile.value = profile
       loadedAt = Date.now()
     })
@@ -86,10 +87,22 @@ const outfitWorn = ref<string | null | undefined>(undefined)
 export const mascotOutfit = computed(() => (outfitWorn.value !== undefined ? outfitWorn.value : (mascotProfile.value?.outfit ?? null)))
 
 /** 换一身（null 是换回平时那身，不花鱼）。鱼不够的前台不让点，后端也会拦 */
-export function dressMascot(outfit: string | null, line: string) {
-  if (outfit) usedLocally.value += MASCOT_OUTFIT_COST
+export function dressMascot(outfit: MascotOutfit | null, line: string) {
+  if (outfit) usedLocally.value += MASCOT_OUTFIT_COSTS[outfit]
   outfitWorn.value = outfit
   return logMascotEvent({ kind: 'dress', action: outfit ?? MASCOT_OUTFIT_NONE, line })
+}
+
+// ---- 图鉴到档的奖励 ----
+
+/** 每个人这一页第一次拉到的图鉴奖励条数：之后涨了才是「刚集到新的一档」，第一次拉到的不算 */
+let collectSeen: { userId: number | null; collect: number } | null = null
+/** 刚多出来的图鉴奖励条数（Mascot.vue 看到了就说一句、清零） */
+export const collectReward = ref(0)
+
+function noteCollectReward(userId: number | null, collect: number) {
+  if (collectSeen && collectSeen.userId === userId && collect > collectSeen.collect) collectReward.value += collect - collectSeen.collect
+  collectSeen = { userId, collect }
 }
 
 /** 刚回答了她的问题：先记在手里的这份数上，不等下次拉（不然 30 秒内可能又问一遍） */
