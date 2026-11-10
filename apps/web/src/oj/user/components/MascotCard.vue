@@ -5,12 +5,13 @@ import { getMascotJournal } from 'oj/api'
 import { fishLeft, mascotProfile } from 'shared/mascot/behavior'
 import { MASCOT_QUESTIONS } from 'shared/mascot/chat'
 import { buildCollection } from 'shared/mascot/collection'
+import { mistakeList } from 'shared/mascot/mistakes'
 import { MASCOT_POSES, poseUrl } from 'shared/mascot/poses'
 import { parseTime } from 'utils/functions'
 
 /**
  * 主页上「小鲸鱼」那张卡：和看板娘的相处记录，点开看全的（各种互动几次、一天里什么时候来找她、
- * 回答过她的问题、见过她的样子、台词收集）。只在自己的主页、学生、电脑上有（她只在电脑上出现）。
+ * 回忆、她指出过的错、回答过她的问题、见过她的样子、台词收集）。只在自己的主页、学生、电脑上有（她只在电脑上出现）。
  * 从没碰过她就不显示。
  */
 const theme = useThemeVars()
@@ -104,6 +105,22 @@ const poses = computed(() => {
 })
 const posesSeen = computed(() => poses.value.filter((it) => it.seen).length)
 
+const mistakes = computed(() => mistakeList(journal.value?.mistakes ?? []))
+
+/** 回忆：几件「第一次」，按时间排（后端排好了） */
+const MOMENTS: Record<string, string> = {
+  first: '第一次见面',
+  sulk: '第一次把她惹到背过身',
+  pat: '第一次摸她的头',
+  feed: '第一次喂小鱼干',
+  feed10: '喂了第 10 条小鱼干',
+  dress: '第一次给她换衣服',
+  fling: '第一次把她甩出去',
+  tickle: '第一次挠她痒',
+  answer: '第一次回答她的问题',
+}
+const moments = computed(() => (journal.value?.moments ?? []).flatMap((it) => (MOMENTS[it.kind] ? [{ ...it, text: MOMENTS[it.kind]! }] : [])))
+
 const latestLine = computed(() => journal.value?.lines[0] ?? null)
 </script>
 
@@ -168,6 +185,26 @@ const latestLine = computed(() => journal.value?.lines[0] ?? null)
             <span v-for="h in [0, 6, 12, 18]" :key="h" :style="{ left: `${(h / 24) * 100}%` }">{{ h }} 点</span>
           </div>
         </div>
+
+        <template v-if="moments.length">
+          <h4>回忆</h4>
+          <ul class="moments">
+            <li v-for="it in moments" :key="it.kind">
+              <span class="when">{{ parseTime(it.at, 'M月D日') }}</span>
+              <span>{{ it.text }}</span>
+            </li>
+          </ul>
+        </template>
+
+        <template v-if="mistakes.length">
+          <h4>她指出过的错</h4>
+          <ul class="mistakes">
+            <li v-for="it in mistakes" :key="it.name">
+              <span>{{ it.name }}</span>
+              <span class="times">{{ it.count }} 次</span>
+            </li>
+          </ul>
+        </template>
 
         <template v-if="answers.length">
           <h4>你跟她说过</h4>
@@ -405,6 +442,39 @@ h4 {
 
 .answers .a {
   font-weight: 600;
+}
+
+.moments,
+.mistakes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 24px;
+}
+
+.moments li,
+.mistakes li {
+  display: flex;
+  gap: 12px;
+}
+
+.moments .when {
+  flex: none;
+  width: 64px;
+  color: var(--j-text3);
+  font-variant-numeric: tabular-nums;
+}
+
+.mistakes li {
+  justify-content: space-between;
+}
+
+.mistakes .times {
+  flex: none;
+  color: var(--j-text3);
+  font-variant-numeric: tabular-nums;
 }
 
 .poses {

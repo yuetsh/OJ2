@@ -18,6 +18,7 @@ import { Hono } from 'hono'
 import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
+import { isTeacherOrAbove } from './helpers'
 import { JudgeStatus } from '../judge/status'
 import { calendarDay, dayNumber, dayStart, localDateTime, localTime, weekStart } from '../time'
 
@@ -342,6 +343,47 @@ mascotRoutes.get('/mascot/profile', requireAuth, async (c) => {
   } satisfies MascotProfile)
 })
 
+/** 她指出过的代码错误（契约 mascotMistakesSchema）：说出口的次数，多的在前 */
+async function mistakesOf(userId: number) {
+  const e = schema.mascotEvent
+  return db
+    .select({ situation: sql<string>`${e.situation}`, count: count() })
+    .from(e)
+    .where(and(eq(e.userId, userId), inArray(e.kind, ['speak', 'open']), sql`(${e.situation} like 'lint.%' or ${e.situation} like 'problem.chinesePunct%')`))
+    .groupBy(e.situation)
+    .orderBy(desc(count()))
+}
+
+/** 回忆（契约 mascotJournalSchema.moments）：几件「第一次」和喂到第 10 条的时刻 */
+async function momentsOf(userId: number) {
+  const e = schema.mascotEvent
+  const first = (where: ReturnType<typeof sql>) => sql<string | null>`min(${e.createdAt}) filter (where ${where})`
+  const [[row], [tenth]] = await Promise.all([
+    db
+      .select({
+        first: first(sql`${e.kind} in ('open', 'pat', 'move', 'play', 'feed', 'dress')`),
+        sulk: first(sql`${e.kind} = 'open' and ${e.situation} = 'sulk'`),
+        pat: first(sql`${e.kind} = 'pat'`),
+        feed: first(sql`${e.kind} = 'feed'`),
+        dress: first(sql`${e.kind} = 'dress' and ${e.action} <> ${MASCOT_OUTFIT_NONE}`),
+        fling: first(sql`${e.kind} = 'play' and ${e.action} = 'fling'`),
+        tickle: first(sql`${e.kind} = 'play' and ${e.action} = 'tickle'`),
+        answer: first(sql`${e.kind} = 'answer'`),
+      })
+      .from(e)
+      .where(eq(e.userId, userId)),
+    db
+      .select({ at: e.createdAt })
+      .from(e)
+      .where(and(eq(e.userId, userId), eq(e.kind, 'feed')))
+      .orderBy(e.createdAt)
+      .offset(9)
+      .limit(1),
+  ])
+  const moments = Object.entries({ ...row, feed10: tenth?.at ?? null }).flatMap(([kind, at]) => (at ? [{ kind, at }] : []))
+  return moments.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+}
+
 /** 和她的相处记录（契约 mascotJournalSchema）：主页那张卡和点开的那一页 */
 mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
   const userId = c.get('user')!.id
@@ -351,7 +393,7 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
   const mine = eq(e.userId, userId)
   const hour = sql<number>`extract(hour from ${localTime(e.createdAt)})::int`
   const page = sql<string>`split_part(${e.path}, '/', 2)`
-  const [summary, hours, pages, lines, poses] = await Promise.all([
+  const [summary, hours, pages, lines, poses, mistakes, moments] = await Promise.all([
     db
       .select({
         firstAt: sql<string | null>`min(${e.createdAt})`,
@@ -380,6 +422,8 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
       .groupBy(e.line)
       .orderBy(desc(sql`max(${e.createdAt})`)),
     posesOf(userId),
+    mistakesOf(userId),
+    momentsOf(userId),
   ])
   // 没有 group by 的聚合永远回一行，碰都没碰过也是一行（count 是 0、min 是 null）
   const { firstAt, days, ...counts } = summary[0]!
@@ -393,6 +437,8 @@ mascotRoutes.get('/mascot/journal', requireAuth, async (c) => {
     favoritePage: pages[0]?.page || null,
     lines: lines.map((it) => it.line!),
     poses,
+    mistakes,
+    moments,
   } satisfies MascotJournal)
 })
 
@@ -405,13 +451,16 @@ mascotRoutes.get('/mascot/of/:username', requireAuth, async (c) => {
     .limit(1)
   if (!target) return failure(c, 404, 'user-not-found', '没有这个用户')
   const e = schema.mascotEvent
-  const [first, outfit, poses] = await Promise.all([
+  // 指出过的错只给老师看：同学之间不给
+  const teacher = isTeacherOrAbove(c.get('user')!)
+  const [first, outfit, poses, mistakes] = await Promise.all([
     db
       .select({ at: sql<string | null>`min(${e.createdAt})` })
       .from(e)
       .where(and(eq(e.userId, target.id), inArray(e.kind, ['open', 'pat', 'move', 'play', 'feed', 'dress']))),
     outfitOf(target.id),
     posesOf(target.id),
+    teacher ? mistakesOf(target.id) : null,
   ])
-  return success(c, { firstAt: first[0]?.at ?? null, outfit, poses: poses.length } satisfies MascotVisit)
+  return success(c, { firstAt: first[0]?.at ?? null, outfit, poses: poses.length, mistakes } satisfies MascotVisit)
 })

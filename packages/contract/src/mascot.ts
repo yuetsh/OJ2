@@ -143,6 +143,13 @@ export const mascotProfileSchema = z.object({
 export type MascotProfile = z.infer<typeof mascotProfileSchema>
 
 /**
+ * 她指出过的代码错误：哪种（situation：`lint.typo`、`problem.chinesePunct` ……，名字由前台对）、几次。
+ * 是她说出口的次数（主动说的 speak 和点她时说的 open），不是代码里出现的次数
+ */
+export const mascotMistakesSchema = z.array(z.object({ situation: z.string(), count: z.number().int() }))
+export type MascotMistakes = z.infer<typeof mascotMistakesSchema>
+
+/**
  * 和她的相处记录（GET /mascot/journal），主页「小鲸鱼」那张卡和点开的那一页用。只给本人看。
  *
  * `lines` 是她对这个学生说过的话（上面 MASCOT_SPOKEN_KINDS 的 line），去重，最近说的在前。
@@ -187,6 +194,12 @@ export const mascotJournalSchema = z.object({
   lines: z.array(z.string()),
   /** 见过她哪些样子（姿势名），同 mascotProfileSchema.poses */
   poses: z.array(z.string()),
+  mistakes: mascotMistakesSchema,
+  /**
+   * 回忆：几件「第一次」和里程碑各发生在什么时候，按时间排。kind 是 first（第一次见面）、sulk（第一次惹到背过身）、
+   * pat、feed、feed10（喂了第 10 条）、dress、fling、tickle、answer；没发生过的不在里面
+   */
+  moments: z.array(z.object({ kind: z.string(), at: z.string() })),
 })
 export type MascotJournal = z.infer<typeof mascotJournalSchema>
 
@@ -200,5 +213,7 @@ export const mascotVisitSchema = z.object({
   outfit: z.string().nullable(),
   /** 见过她几个样子 */
   poses: z.number().int(),
+  /** 她给这个学生指出过的错。只给老师（看的人是老师才有），同学之间不给，是 null */
+  mistakes: mascotMistakesSchema.nullable(),
 })
 export type MascotVisit = z.infer<typeof mascotVisitSchema>
