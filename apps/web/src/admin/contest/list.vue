@@ -111,7 +111,8 @@ const desktopColumns: DataTableColumn<AdminContestListItem>[] = [
   {
     title: '开始 · 多长',
     key: 'start_time',
-    width: 200,
+    // 最长的是「2026-11-08 13:08 · 47 小时 59 分」，整串不折行，窄了会压到「状态」那列上
+    width: 290,
     render: (row) => h('span', { class: 'num' }, [parseTime(row.startTime, 'YYYY-MM-DD HH:mm'), h('span', { class: 'muted' }, ` · ${duration(row)}`)]),
   },
   {
