@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NA, NSwitch, useThemeVars } from 'naive-ui'
+import { NButton, NSwitch, useThemeVars } from 'naive-ui'
 import Pagination from 'shared/components/Pagination.vue'
 import { usePagination } from 'shared/composables/pagination'
 import { parseTime } from 'utils/functions'
@@ -128,8 +128,11 @@ function renderTitle(row: AdminProblemRow) {
   ]
   return h('span', { class: 'title-cell' }, [
     h(
-      NA,
+      NButton,
       {
+        text: true,
+        type: 'primary',
+        tag: 'a',
         href: router.resolve(editRoute(row.id)).href,
         onClick: (event: MouseEvent) => {
           if (event.ctrlKey || event.metaKey || event.shiftKey) return
@@ -137,7 +140,7 @@ function renderTitle(row: AdminProblemRow) {
           router.push(editRoute(row.id))
         },
       },
-      row.title,
+      () => row.title,
     ),
     ...kinds,
   ])

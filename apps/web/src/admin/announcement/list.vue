@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PageHeader from 'admin/components/PageHeader.vue'
-import { NA, NSwitch, useThemeVars } from 'naive-ui'
+import { NButton, NSwitch, useThemeVars } from 'naive-ui'
 import { useRouter } from 'vue-router'
 import Pagination from 'shared/components/Pagination.vue'
 import { parseTime } from 'utils/functions'
@@ -30,8 +30,11 @@ const { isMobile } = useBreakpoints()
 function renderTitle(row: AdminAnnouncementListItem) {
   return h('span', { class: 'title-cell' }, [
     h(
-      NA,
+      NButton,
       {
+        text: true,
+        type: 'primary',
+        tag: 'a',
         href: router.resolve({ name: 'admin announcement edit', params: { announcementID: row.id } }).href,
         onClick: (event: MouseEvent) => {
           if (event.ctrlKey || event.metaKey || event.shiftKey) return
