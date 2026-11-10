@@ -876,9 +876,9 @@ onMounted(async () => {
           <div class="tagRow">
             <span class="label tagLabel">知识点</span>
             <div class="chips">
-              <n-checkable-tag v-for="name in visibleKnowledge" :key="name" :checked="form.tags.includes(name)" @update:checked="toggleKnowledge(name)">
+              <n-tag v-for="name in visibleKnowledge" :key="name" checkable :checked="form.tags.includes(name)" @update:checked="toggleKnowledge(name)">
                 {{ name }}
-              </n-checkable-tag>
+              </n-tag>
               <n-button v-if="knowledgeTags.length > 10" size="tiny" quaternary @click="showAllKnowledge = !showAllKnowledge">
                 {{ showAllKnowledge ? '收起' : `更多 ${knowledgeTags.length - 10} 个 ▾` }}
               </n-button>
