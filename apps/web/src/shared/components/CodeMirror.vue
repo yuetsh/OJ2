@@ -47,7 +47,7 @@ const compartments = {
 const disabledExt = (value: boolean) => (value ? [EditorView.editable.of(false), EditorState.readOnly.of(true)] : [])
 const tabSizeExt = (size: number) => [EditorState.tabSize.of(size), indentUnit.of(' '.repeat(size))]
 const placeholderOf = (text: string) => (text ? placeholderExt(text) : [])
-const sizeExt = (h: string, fs: string) => EditorView.theme({ '&': fs ? { height: h, fontSize: fs } : { height: h }, '.cm-scroller': { lineHeight: '1.6' } })
+const sizeExt = (h: string, fs: string) => EditorView.theme({ '&': fs ? { height: h, fontSize: fs } : { height: h }, '.cm-scroller': { lineHeight: '1.8' } })
 
 onMounted(() => {
   view = new EditorView({
