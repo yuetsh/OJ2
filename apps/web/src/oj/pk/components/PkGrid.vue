@@ -246,13 +246,9 @@ const medal = (index: number) => palette.value.medal[index]
 .name a {
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
   min-width: 0;
-}
-
-.name a:hover {
-  text-decoration: underline;
 }
 
 .id {

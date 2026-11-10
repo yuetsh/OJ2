@@ -520,11 +520,7 @@ function pct(done: number, total: number) {
 .s-link {
   font-weight: 600;
   text-decoration: none;
-  color: v-bind('theme.primaryColor');
-}
-
-.s-link:hover {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .chip {
@@ -682,11 +678,7 @@ function pct(done: number, total: number) {
   overflow: hidden;
   text-overflow: ellipsis;
   text-decoration: none;
-  color: v-bind('theme.primaryColor');
-}
-
-.d-title:hover .d-name {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .d-state {

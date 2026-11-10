@@ -370,11 +370,11 @@ function contestTime(contest: Contest) {
         已解决 {{ userStore.profile?.acceptedNumber ?? 0 }} 题
         <template v-if="weeklyText">
           ·
-          <router-link to="/rank" class="plain-link">{{ weeklyText }}</router-link>
+          <router-link to="/rank" class="oj-link">{{ weeklyText }}</router-link>
         </template>
         <template v-if="knowledgeHeadline">
           ·
-          <router-link v-if="knowledgeHeadline.to" :to="knowledgeHeadline.to" class="plain-link">
+          <router-link v-if="knowledgeHeadline.to" :to="knowledgeHeadline.to" class="oj-link">
             {{ knowledgeHeadline.text }}
           </router-link>
           <span v-else>{{ knowledgeHeadline.text }}</span>
@@ -689,14 +689,5 @@ a.row:hover {
 
 .visit-foot .go {
   flex: none;
-}
-
-.plain-link {
-  color: #18a058;
-  text-decoration: none;
-}
-
-.plain-link:hover {
-  text-decoration: underline;
 }
 </style>

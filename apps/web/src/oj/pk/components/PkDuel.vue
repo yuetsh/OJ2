@@ -455,15 +455,11 @@ const tab = ref<'weekly' | 'dist'>('weekly')
   max-width: 100%;
   font-size: var(--oj-fs-sec);
   font-weight: 600;
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
 }
 
 .title a:hover,
-.m-title a:hover {
-  text-decoration: underline;
-}
-
 .ell {
   white-space: nowrap;
   overflow: hidden;

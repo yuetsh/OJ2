@@ -1214,12 +1214,8 @@ function lastText(student: TaskBoardStudent) {
 .panel-title {
   font-size: 16px;
   font-weight: 600;
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
-}
-
-.panel-title:hover {
-  text-decoration: underline;
 }
 
 .groups {

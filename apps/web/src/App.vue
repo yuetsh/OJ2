@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { darkTheme, dateZhCN, zhCN } from 'naive-ui'
+import { darkTheme, dateZhCN, lightTheme, zhCN } from 'naive-ui'
 import 'normalize.css'
 import './index.css'
 import 'shared/highlight.css'
@@ -10,6 +10,12 @@ import { useCollabStore } from 'shared/store/collab'
 import CollabHost from 'shared/components/CollabHost.vue'
 
 const isDark = useDark()
+
+// 链接色：全站只有这一个来源，取 Naive 当前主题的主色。样式里写 var(--oj-link) 或直接用 .oj-link，
+// 不要再各自 v-bind('theme.primaryColor') 或写死色值。
+watchEffect(() => {
+  document.documentElement.style.setProperty('--oj-link', (isDark.value ? darkTheme : lightTheme).common.primaryColor)
+})
 const configStore = useConfigStore()
 const userStore = useUserStore()
 const collabStore = useCollabStore()

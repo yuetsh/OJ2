@@ -272,11 +272,7 @@ const shortcuts = computed(() =>
 }
 
 .mini b.num {
-  color: v-bind('theme.primaryColor');
-}
-
-.mini:hover b.num {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .mini i {

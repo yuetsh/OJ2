@@ -142,14 +142,10 @@ function shortLabel(className: string) {
   border: 0;
   background: none;
   font: inherit;
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.name:hover {
-  text-decoration: underline;
 }
 
 .pk {

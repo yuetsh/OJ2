@@ -369,11 +369,7 @@ const canRetry = computed(
 }
 
 .user-link :deep(.name) {
-  color: v-bind('theme.primaryColor');
-}
-
-.user-link:hover :deep(.name) {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .render-error {
@@ -421,14 +417,10 @@ const canRetry = computed(
 }
 
 .problem {
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.problem:hover {
-  text-decoration: underline;
 }
 
 .after-problem {

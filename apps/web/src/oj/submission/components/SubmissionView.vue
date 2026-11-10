@@ -374,11 +374,7 @@ function handleMore(key: string) {
 }
 
 .user-link :deep(.name) {
-  color: v-bind('theme.primaryColor');
-}
-
-.user-link:hover :deep(.name) {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .cls {
@@ -401,12 +397,8 @@ function handleMore(key: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 600;
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
-}
-
-.problem:hover {
-  text-decoration: underline;
 }
 
 .problem-id {

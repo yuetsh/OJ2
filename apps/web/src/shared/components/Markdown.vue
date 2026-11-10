@@ -110,12 +110,8 @@ onKeyStroke('Escape', () => {
 }
 
 .oj-markdown a {
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
-}
-
-.oj-markdown a:hover {
-  text-decoration: underline;
 }
 
 /* 富文本存的图片带行内 style="width; height"，宽被 max-width 压窄时高还是原值，

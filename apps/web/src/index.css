@@ -55,3 +55,9 @@ body {
 .n-modal {
   max-width: calc(100vw - 32px);
 }
+
+/* 链接：主题色、平时就看得出能点，hover 不加下划线。--oj-link 由 App.vue 随明暗主题设置 */
+.oj-link {
+  color: var(--oj-link);
+  text-decoration: none;
+}

@@ -159,11 +159,7 @@ const fresh = computed(() => props.progress.solved === 0)
 
 .next b {
   font-weight: 600;
-  color: v-bind('theme.primaryColor');
-}
-
-.next:hover b {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .start {

@@ -448,11 +448,7 @@ const columns = computed(() => {
 
 .ph b {
   font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-}
-
-.ph:hover b {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .ph span {

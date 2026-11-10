@@ -154,7 +154,7 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
       <span v-if="progress?.isCompleted" class="done-mark" aria-hidden="true">✓</span>
       <div class="head">
         <div class="row">
-          <router-link :to="{ name: 'problemsets' }" class="back">‹ 专题</router-link>
+          <router-link :to="{ name: 'problemsets' }" class="back oj-link">‹ 专题</router-link>
           <h2 class="ell">{{ set.title }}</h2>
           <span v-if="set.assigning" class="pill assign">布置到 {{ parseTime(set.assignedUntil!, 'M月D日') }}</span>
         </div>
@@ -345,12 +345,6 @@ const purple = { color: '#5b3fa8', background: 'rgba(122, 95, 208, 0.12)' }
 .back {
   flex-shrink: 0;
   font-size: var(--oj-fs-sec);
-  color: v-bind('theme.primaryColor');
-  text-decoration: none;
-}
-
-.back:hover {
-  text-decoration: underline;
 }
 
 .count {

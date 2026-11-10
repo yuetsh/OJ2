@@ -480,12 +480,8 @@ function percent(value: number, total: number) {
 }
 
 .hard-title a {
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
-}
-
-.hard-title a:hover {
-  text-decoration: underline;
 }
 
 .mini {

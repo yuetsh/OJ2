@@ -424,11 +424,7 @@ function openStandalone() {
 }
 
 .user-link :deep(.name) {
-  color: v-bind('theme.primaryColor');
-}
-
-.user-link:hover :deep(.name) {
-  text-decoration: underline;
+  color: var(--oj-link);
 }
 
 .who {
@@ -448,15 +444,11 @@ function openStandalone() {
 }
 
 .problem {
-  color: v-bind('theme.primaryColor');
+  color: var(--oj-link);
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-}
-
-.problem:hover {
-  text-decoration: underline;
 }
 
 .problem-id {
