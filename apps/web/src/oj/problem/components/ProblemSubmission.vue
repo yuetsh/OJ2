@@ -5,9 +5,10 @@ import { useCodeStore } from 'oj/store/code'
 import { useProblemStore } from 'oj/store/problem'
 import LockNote from 'oj/problemset/components/LockNote.vue'
 import Pagination from 'shared/components/Pagination.vue'
+import { highlight } from 'shared/highlight'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
-import { JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
+import { JUDGE_STATUS, LANGUAGE_FORMAT_VALUE, LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { copyToClipboard, parseTime } from 'utils/functions'
 import type { ProblemRank } from '@oj2/contract'
 import type { LANGUAGE, SubmissionListItem } from 'utils/types'
@@ -196,6 +197,13 @@ async function putBack(id: string) {
   message.success('已放回编辑器，按 Ctrl+Z 可以撤回')
 }
 
+/** 预览的高亮 HTML；被截断时末尾补一个「……」 */
+function previewHtml(id: string) {
+  const p = preview(id)
+  const lang = LANGUAGE_FORMAT_VALUE[loadedOf(id)!.language]
+  return highlight(p.text, lang) + (p.more ? '<span class="code-cut">……</span>' : '')
+}
+
 async function copy(id: string) {
   const loaded = loadedOf(id)
   if (!loaded) return
@@ -278,7 +286,7 @@ watch(query, () => {
             </n-flex>
             <n-text v-else-if="details[row.id] === 'failed'" type="error"> 代码读不出来，收起来再点开试试 </n-text>
             <template v-else-if="loadedOf(row.id)">
-              <pre class="code">{{ preview(row.id).text }}<span v-if="preview(row.id).more" class="code-cut">……</span></pre>
+              <pre class="code" v-html="previewHtml(row.id)"></pre>
               <div class="detail-actions">
                 <n-button v-if="preview(row.id).more" size="small" @click="fullCode[row.id] = true">看全部 {{ preview(row.id).total }} 行</n-button>
                 <n-button
@@ -451,7 +459,7 @@ watch(query, () => {
   white-space: pre;
 }
 
-.code-cut {
+:deep(.code-cut) {
   color: v-bind('theme.textColor3');
 }
 
