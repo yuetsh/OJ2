@@ -3,7 +3,7 @@
  * 同一套语法，同步渲染、没有依赖，流程图部分 gzip 后 44 kB（mermaid 要 200 kB 以上）。
  * 换之前拿库里全部 2170 张图对过：两边能画的、报错的完全一致。
  *
- * pele 的版本号锁死（不带 ^）：项目 2026-10 才开，小版本也在改排版。
+ * pele 的版本号带 ^，不锁死：升级后流程图的排版或 DOM 若变了，上面的配色选择器要跟着看。
  */
 
 const semanticNodeClasses = ['startNode', 'endNode', 'startEnd', 'input', 'output', 'process', 'decision', 'loop']
