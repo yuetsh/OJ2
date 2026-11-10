@@ -21,7 +21,7 @@ import { plainText } from '../services/hint-diagnosis'
 import { recordSolvedAndNotify } from '../services/problemset'
 import { runTrial } from '../judge/trial'
 import { flowchartCases, type FlowchartCase } from './cases'
-import { buildProgram, describeDoc, flowBoxes, judgeCase, TRANSLATE_PROMPT } from './program'
+import { buildProgram, describeDoc, flowBoxes, judgeCase, literalCondition, TRANSLATE_PROMPT } from './program'
 import { gradeForCases, gradeForScore } from './grade'
 import type { FlowchartJobData } from './job'
 import { flowchartAnswer, parseReview, REVIEW_PROMPT, reviewInput, type FlowchartReview } from './review'
@@ -113,7 +113,13 @@ async function evaluateByRunning(problem: Problem, submission: typeof schema.flo
   ])
   const walk = (steps: FlowStep[]) => {
     for (const step of steps) {
-      texts.set(nodeOf(step), step.text.trim())
+      const node = nodeOf(step)
+      texts.set(node, step.text.trim())
+      // 条件写的已经是算式就照字面跑，别让模型把写反的条件「顺手改对」（见 literalCondition）
+      if (step.kind === 'if' || step.kind === 'while') {
+        const literal = literalCondition(step.text, code[node])
+        if (literal) code[node] = literal
+      }
       for (const child of flowChildren(step)) walk(child)
     }
   }
