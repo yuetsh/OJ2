@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { renderEditLink } from 'admin/components/editLink'
 import PageHeader from 'admin/components/PageHeader.vue'
 import Pagination from 'shared/components/Pagination.vue'
 import { usePagination } from 'shared/composables/pagination'
 import { parseTime } from 'utils/functions'
 import type { AdminProblemSet } from 'utils/types'
 import { getProblemSetList, toggleProblemSetVisible } from '../api'
-import { NButton, NSwitch, NTag, useThemeVars } from 'naive-ui'
+import { NSwitch, NTag, useThemeVars } from 'naive-ui'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useListLoader } from 'shared/composables/listLoader'
 
@@ -21,12 +22,8 @@ const problemSets = ref<AdminProblemSet[]>([])
 
 const { query, clearQuery } = usePagination<{ keyword: string }>({ keyword: '' })
 
-function edit(row: AdminProblemSet) {
-  router.push({ name: 'admin problemset edit', params: { problemSetId: row.id } })
-}
-
 function renderTitle(row: AdminProblemSet) {
-  return h(NButton, { text: true, type: 'primary', onClick: () => edit(row) }, { default: () => row.title })
+  return renderEditLink(router, { name: 'admin problemset edit', params: { problemSetId: row.id } }, row.title)
 }
 
 function renderAssigned(row: AdminProblemSet) {

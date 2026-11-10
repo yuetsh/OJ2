@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { renderEditLink } from 'admin/components/editLink'
 import type { AdminContestListItem } from '@oj2/contract'
 import PageHeader from 'admin/components/PageHeader.vue'
 import { NSwitch, useThemeVars } from 'naive-ui'
@@ -17,6 +18,7 @@ import { useListLoader } from 'shared/composables/listLoader'
  * 操作「编辑」「成绩 / 全班情况」「复制一份」「在前台看」直接摆出来。按开始时间排 —— 原来按创建时间，复制出来的旧比赛
  * 会跑到最前面。ID、标签、类型三列拿掉（标签只在期中 / 期末时挂出来，类型就是那把锁）
  */
+const router = useRouter()
 const theme = useThemeVars()
 const { isMobile } = useBreakpoints()
 const contests = ref<AdminContestListItem[]>([])
@@ -47,7 +49,10 @@ function duration(row: AdminContestListItem) {
 const EXAM_TAGS = ['期中', '期末']
 
 function renderTitle(row: AdminContestListItem) {
-  return h('span', { class: 'title-cell' }, [h(ContestTitle, { contest: row }), EXAM_TAGS.includes(row.tag) ? h('span', { class: 'exam' }, row.tag) : null])
+  return h('span', { class: 'title-cell' }, [
+    renderEditLink(router, { name: 'admin contest edit', params: { contestID: row.id } }, h(ContestTitle, { contest: row })),
+    EXAM_TAGS.includes(row.tag) ? h('span', { class: 'exam' }, row.tag) : null,
+  ])
 }
 
 function renderStatus(row: AdminContestListItem) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { renderEditLink } from 'admin/components/editLink'
 import { NButton, NTag } from 'naive-ui'
 import Pagination from 'shared/components/Pagination.vue'
 import type { AdminProblemRow } from 'utils/types'
@@ -35,7 +36,7 @@ const allColumns: DataTableColumn<AdminProblemRow>[] = [
     title: '题目',
     key: 'title',
     minWidth: 200,
-    render: (row) => h(NButton, { text: true, type: 'primary', onClick: () => goEdit(row) }, () => row.title),
+    render: (row) => renderEditLink(router, { name: 'admin problem edit', params: { problemID: row.id } }, row.title, close),
   },
   {
     title: '学生看得到',
@@ -72,11 +73,6 @@ async function listProblems() {
 
 function close() {
   emit('update:show', false)
-}
-
-function goEdit(row: AdminProblemRow) {
-  close()
-  router.push({ name: 'admin problem edit', params: { problemID: row.id } })
 }
 
 async function removeTag(row: AdminProblemRow) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { renderEditLink } from 'admin/components/editLink'
 import PageHeader from 'admin/components/PageHeader.vue'
 import { NButton, NSwitch, useThemeVars } from 'naive-ui'
 import { useRouter } from 'vue-router'
@@ -29,21 +30,7 @@ const { isMobile } = useBreakpoints()
 
 function renderTitle(row: AdminAnnouncementListItem) {
   return h('span', { class: 'title-cell' }, [
-    h(
-      NButton,
-      {
-        text: true,
-        type: 'primary',
-        tag: 'a',
-        href: router.resolve({ name: 'admin announcement edit', params: { announcementID: row.id } }).href,
-        onClick: (event: MouseEvent) => {
-          if (event.ctrlKey || event.metaKey || event.shiftKey) return
-          event.preventDefault()
-          router.push({ name: 'admin announcement edit', params: { announcementID: row.id } })
-        },
-      },
-      () => row.title,
-    ),
+    renderEditLink(router, { name: 'admin announcement edit', params: { announcementID: row.id } }, row.title),
     row.top ? h('span', { class: 'top' }, '置顶') : null,
     h('span', { class: 'muted small' }, row.tag),
   ])

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { renderEditLink } from 'admin/components/editLink'
 import { NButton, NSwitch, useThemeVars } from 'naive-ui'
 import Pagination from 'shared/components/Pagination.vue'
 import { usePagination } from 'shared/composables/pagination'
@@ -126,24 +127,7 @@ function renderTitle(row: AdminProblemRow) {
     row.allowFlowchart ? h(ProblemTypeTag, { kind: 'flowchart' }) : null,
     row.hasAstRules ? h(ProblemTypeTag, { kind: 'ast' }) : null,
   ]
-  return h('span', { class: 'title-cell' }, [
-    h(
-      NButton,
-      {
-        text: true,
-        type: 'primary',
-        tag: 'a',
-        href: router.resolve(editRoute(row.id)).href,
-        onClick: (event: MouseEvent) => {
-          if (event.ctrlKey || event.metaKey || event.shiftKey) return
-          event.preventDefault()
-          router.push(editRoute(row.id))
-        },
-      },
-      () => row.title,
-    ),
-    ...kinds,
-  ])
+  return h('span', { class: 'title-cell' }, [renderEditLink(router, editRoute(row.id), row.title), ...kinds])
 }
 
 function editRoute(problemID: number) {
