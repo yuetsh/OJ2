@@ -21,6 +21,7 @@ const {
   placeholder = '',
   height = '100%',
   fontSize = '',
+  lineHeight = '',
 } = defineProps<{
   /** 传稳定的数组实例：每换一个新数组，编辑器就重配一次 */
   extensions?: Extension[]
@@ -29,6 +30,8 @@ const {
   placeholder?: string
   height?: string
   fontSize?: string
+  /** 不传就用 CodeMirror 自带的 1.4；只有题目页的主编辑器放宽 */
+  lineHeight?: string
 }>()
 const code = defineModel<string>({ default: '' })
 const emit = defineEmits<{ ready: [view: EditorView] }>()
@@ -47,7 +50,8 @@ const compartments = {
 const disabledExt = (value: boolean) => (value ? [EditorView.editable.of(false), EditorState.readOnly.of(true)] : [])
 const tabSizeExt = (size: number) => [EditorState.tabSize.of(size), indentUnit.of(' '.repeat(size))]
 const placeholderOf = (text: string) => (text ? placeholderExt(text) : [])
-const sizeExt = (h: string, fs: string) => EditorView.theme({ '&': fs ? { height: h, fontSize: fs } : { height: h }, '.cm-scroller': { lineHeight: '1.8' } })
+const sizeExt = (h: string, fs: string, lh: string) =>
+  EditorView.theme({ '&': fs ? { height: h, fontSize: fs } : { height: h }, ...(lh ? { '.cm-scroller': { lineHeight: lh } } : {}) })
 
 onMounted(() => {
   view = new EditorView({
@@ -66,7 +70,7 @@ onMounted(() => {
         keymap.of([indentWithTab]),
         compartments.tabSize.of(tabSizeExt(tabSize)),
         compartments.placeholder.of(placeholderOf(placeholder)),
-        compartments.size.of(sizeExt(height, fontSize)),
+        compartments.size.of(sizeExt(height, fontSize, lineHeight)),
       ],
     }),
   })
@@ -104,7 +108,7 @@ watch(
   () => placeholder,
   (value) => reconfigure(compartments.placeholder, placeholderOf(value)),
 )
-watch([() => height, () => fontSize], ([h, fs]) => reconfigure(compartments.size, sizeExt(h, fs)))
+watch([() => height, () => fontSize, () => lineHeight], ([h, fs, lh]) => reconfigure(compartments.size, sizeExt(h, fs, lh)))
 </script>
 
 <template>

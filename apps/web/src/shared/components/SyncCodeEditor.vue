@@ -221,6 +221,7 @@ onUnmounted(() => {
     :placeholder="placeholder"
     :height="height"
     :font-size="`${fontSize}px`"
+    line-height="1.8"
     @ready="handleEditorReady"
   />
 </template>
