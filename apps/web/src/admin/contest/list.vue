@@ -102,18 +102,21 @@ const mobileColumns: DataTableColumn<AdminContestListItem>[] = [
 ]
 
 const desktopColumns: DataTableColumn<AdminContestListItem>[] = [
+  // 1366 宽的屏幕上表格只有 1118px，最后一列四个按钮要 270，前面几列加起来不能超过 848，否则整张表横着滚、按钮被切掉
   {
     title: '比赛',
     key: 'title',
-    width: 260,
+    width: 220,
     render: renderTitle,
   },
   {
     title: '开始 · 多长',
     key: 'start_time',
-    // 最长的是「2026-11-08 13:08 · 47 小时 59 分」，整串不折行，窄了会压到「状态」那列上
-    width: 290,
-    render: (row) => h('span', { class: 'num' }, [parseTime(row.startTime, 'YYYY-MM-DD HH:mm'), h('span', { class: 'muted' }, ` · ${duration(row)}`)]),
+    // 最长的「2026-11-08 13:08 · 47 小时 59 分」实测 213px，加格子留白正好放下。日期和时长各自不断开，
+    // 字体宽一点放不下时时长掉到第二行，不会伸出去压到「状态」上
+    width: 240,
+    render: (row) =>
+      h('span', null, [h('span', { class: 'num' }, parseTime(row.startTime, 'YYYY-MM-DD HH:mm')), h('span', { class: 'muted nowrap' }, ` · ${duration(row)}`)]),
   },
   {
     title: '状态',
@@ -188,6 +191,12 @@ watchDebounced(() => query.keyword, listContests, {
   font-weight: 500;
 }
 
+/* ContestTitle 本身是一行截断（前台卡片要的），后台表格里名字末尾常是「（21 计算机 2 班）」，截掉就分不清，改成折行 */
+.contest-table :deep(.contest-title .text) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .contest-table :deep(.m-card) {
   display: flex;
   flex-direction: column;
@@ -212,6 +221,8 @@ watchDebounced(() => query.keyword, listContests, {
 
 .contest-table :deep(.exam) {
   display: inline-flex;
+  flex-shrink: 0;
+  white-space: nowrap;
   align-items: center;
   height: 20px;
   padding: 0 6px;
@@ -224,6 +235,10 @@ watchDebounced(() => query.keyword, listContests, {
 
 .contest-table :deep(.num) {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.contest-table :deep(.nowrap) {
   white-space: nowrap;
 }
 

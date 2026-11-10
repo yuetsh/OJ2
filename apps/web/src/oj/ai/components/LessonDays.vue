@@ -105,7 +105,7 @@ h3 small {
 }
 
 .when {
-  width: 92px;
+  width: 100px;
   flex-shrink: 0;
   line-height: 30px;
   white-space: nowrap;
