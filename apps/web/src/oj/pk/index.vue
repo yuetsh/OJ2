@@ -215,7 +215,6 @@ async function analyze() {
         <template v-else>
           <div v-if="!pk.problems.length" class="card empty">
             <b>这几个班{{ period === 'week' ? '这周' : '这学期' }}还没有一起布置过的题</b>
-            <span class="muted">一个班过半的人交过这道题才算布置过，至少两个班都布置过才能按题比</span>
             <PkRace v-if="period === 'term'" :pk="pk" :height="240" class="empty-race" />
           </div>
           <PkDuel v-else-if="mode === 'duel'" :pk="pk" :compact="!isDesktop" />

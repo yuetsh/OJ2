@@ -2,7 +2,6 @@
 import ExerciseResult from './ExerciseResult.vue'
 import type { Exercise, ExerciseGroupData } from 'utils/types'
 import { shuffle } from '../composables/useShuffle'
-import { useBreakpoints } from 'shared/composables/breakpoints'
 
 const props = defineProps<{ exercise: Exercise; lang?: string }>()
 const emit = defineEmits<{
@@ -10,7 +9,6 @@ const emit = defineEmits<{
 }>()
 
 const data = computed(() => props.exercise.data as ExerciseGroupData)
-const { isDesktop } = useBreakpoints()
 
 const order = ref<number[]>([]) // item 的稳定展示顺序（初始乱序）
 const placement = ref<number[]>([]) // placement[itemIdx] = 桶下标，-1 表示在池中
@@ -119,9 +117,6 @@ function reset() {
   <div>
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
-    </p>
-    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">
-      {{ isDesktop ? '把下面的项目拖到对应的分组里，可在分组间拖动调整。' : '先点一个项目，再点它该去的分组。' }}
     </p>
 
     <div

@@ -10,7 +10,6 @@ import CaseBlocks from './CaseBlocks.vue'
 const props = defineProps<{
   kind: 'success' | 'error' | 'warning' | 'info' | 'pending'
   title: string
-  sub?: string
   /** 测试点进度：通过几个、一共几个 */
   progress?: { passed: number; total: number } | null
   /**
@@ -87,7 +86,6 @@ const color = computed(() => {
         </svg>
       </span>
       <span class="title">{{ title }}</span>
-      <span v-if="sub" class="sub">{{ sub }}</span>
       <slot name="extra" />
     </div>
     <CaseBlocks v-if="cases && cases.length" :results="cases" :animate="!!animate" class="cases" @done="emit('revealed')" />

@@ -150,7 +150,7 @@ function percent(value: number, total: number) {
     </div>
 
     <div v-if="!lessonCount && !data.scattered.length" class="empty">这段时间没有人交</div>
-    <div v-else-if="!lessonCount" class="note">这段时间没有哪个班一起上课（同一个班 5 人以上做同一道题才算一节课），只有零散提交</div>
+    <div v-else-if="!lessonCount" class="note">这段时间没有哪个班一起上课，只有零散提交</div>
 
     <template v-for="group in days" :key="group.day">
       <div class="day">{{ group.label }}</div>

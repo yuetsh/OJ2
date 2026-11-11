@@ -232,12 +232,8 @@ function goCode() {
     <template v-if="phase === 'evaluating' && viewingLatest">
       <div class="grading">
         <n-spin :size="26" />
-        <div>
-          <div class="grading-title">AI 正在看你的图</div>
-          <div class="grading-note">一般 5 秒左右。可以先去看题目，评完这里会亮起来</div>
-        </div>
+        <div class="grading-title">AI 正在看你的图</div>
       </div>
-      <p class="note">评的时候画布上还能改，改了不影响这一次的分数</p>
     </template>
 
     <div v-else-if="phase === 'failed' && viewingLatest" class="failed">AI 这次没评出来，再点一次「交给 AI 点评」试试</div>
@@ -406,12 +402,6 @@ function goCode() {
 .grading-title {
   font-size: 16px;
   font-weight: 700;
-}
-
-.grading-note {
-  margin-top: 2px;
-  font-size: 13px;
-  color: v-bind('theme.textColor2');
 }
 
 .failed {

@@ -63,11 +63,11 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
     <span>正在用例子试跑……</span>
   </n-flex>
 
-  <n-empty v-else-if="!sampleRuns.length" class="state" description="还没运行过。点工具栏的「运行例子」，用题目里的例子试跑一遍，不算提交" />
+  <n-empty v-else-if="!sampleRuns.length" class="state" description="还没运行过。点工具栏的「运行例子」，用题目里的例子试跑一遍" />
 
   <n-flex v-else vertical :size="12">
-    <!-- 设计稿「运行例子：例子 2 没对上（不算提交）」：标题、「不算提交」、各例子的芯片在一行 -->
-    <ResultHeader :kind="header.kind" :title="header.title" sub="（不算提交）">
+    <!-- 标题和各例子的芯片在一行 -->
+    <ResultHeader :kind="header.kind" :title="header.title">
       <template v-if="header.chips" #extra>
         <div class="runs">
           <button
@@ -140,8 +140,6 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
         :plain="inContest"
       />
     </template>
-
-    <p class="note">例子都对上了再按「提交」。例子对了也可能在别的测试点上错，提交才算数。</p>
   </n-flex>
 </template>
 
@@ -231,11 +229,5 @@ const current = computed(() => sampleRuns.value[selected.value] ?? null)
 .pane.ok {
   background-color: rgba(24, 160, 88, 0.08);
   border: 1px solid rgba(24, 160, 88, 0.26);
-}
-
-.note {
-  margin: 16px 0 0;
-  font-size: 13px;
-  color: v-bind('theme.textColor3');
 }
 </style>

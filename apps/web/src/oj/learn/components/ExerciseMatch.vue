@@ -125,7 +125,6 @@ function dotStyle(color: string): Record<string, string> {
     <p style="font-weight: 500; font-size: 16px; margin-bottom: 8px">
       {{ data.question }}
     </p>
-    <p style="color: var(--learn-muted); font-size: 13px; margin: 0 0 12px">先点左边一项，再点右边一项即可连线；点击已连线的项可取消。</p>
 
     <div style="display: flex; gap: 24px; align-items: flex-start">
       <n-space vertical :size="8" style="flex: 1">

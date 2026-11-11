@@ -29,7 +29,7 @@ function fillSample(input: string) {
 </script>
 
 <template>
-  <!-- 设计稿「自己输入：顶替原来的『自测』模式」；「这里不判对错」在分段那一行右边（ResultPane） -->
+  <!-- 设计稿「自己输入：顶替原来的『自测』模式」 -->
   <div class="custom">
     <SectionHead icon="input">输入</SectionHead>
     <n-input

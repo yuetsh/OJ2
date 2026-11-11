@@ -90,7 +90,6 @@ function pick(segment: Segment) {
           {{ segment.label }}<span v-if="segment.time" class="segment-time">{{ segment.time }}</span>
         </button>
       </div>
-      <span v-if="resultSegment === 'custom'" class="segment-note">自己编数据试试，这里不判对错</span>
     </div>
 
     <!-- 提交结果用 v-show：切去看运行例子时不卸载，挂着的错误说明在编辑器里标着红 -->
@@ -152,11 +151,6 @@ function pick(segment: Segment) {
   margin-left: 4px;
   font-size: 12px;
   font-weight: 400;
-  color: v-bind('theme.textColor3');
-}
-
-.segment-note {
-  font-size: 13px;
   color: v-bind('theme.textColor3');
 }
 

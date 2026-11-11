@@ -268,8 +268,6 @@ function sectorAriaLabel(index: number) {
     }"
     aria-label="题目点评"
   >
-    <p v-if="choosable" class="hint">选一块最接近的，<b>每道题只能评一次</b>。选完就能看到大家是怎么选的</p>
-
     <div class="wheel" :class="[`is-${state}`, { 'is-waiting': choosable && !ready }]" @pointerleave="preview(null)">
       <svg viewBox="0 0 400 400" class="wheel-svg">
         <g
@@ -348,17 +346,6 @@ function sectorAriaLabel(index: number) {
 .reaction {
   max-width: 560px;
   margin: 0 auto;
-  color: var(--text);
-}
-
-.hint {
-  margin: 0 0 12px;
-  text-align: center;
-  font-size: 14px;
-  color: var(--faint);
-}
-
-.hint b {
   color: var(--text);
 }
 
