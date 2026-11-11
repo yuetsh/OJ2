@@ -31,6 +31,7 @@ import { failure, parseBody, success } from '../../http'
 import { classKeywordCondition, queryInteger, sampleUser } from '../helpers'
 import { publishConfigUpdate } from '../../events'
 import { getWebsiteOptions } from '../../services/options'
+import { usernameCondition } from '../../services/username-search'
 
 export const adminAccountRoutes = new Hono<AppEnv>()
 
@@ -99,7 +100,7 @@ adminAccountRoutes.get('/rankings/users', requireSuperAdmin, async (c) => {
     inArray(schema.user.adminType, [...STUDENT_ROLES]),
     eq(schema.user.isDisabled, false),
     // 填的是班号（251，或者老习惯 ks251）按班级圈，否则按用户名包含
-    keyword ? (classKeywordCondition(keyword) ?? ilike(schema.user.username, `%${keyword}%`)) : undefined,
+    keyword ? (classKeywordCondition(keyword) ?? (await usernameCondition(keyword))) : undefined,
   )
 
   const [totalRows, rows] = await Promise.all([
@@ -146,7 +147,7 @@ adminAccountRoutes.get('/users', requireSuperAdmin, async (c) => {
     filters.push(eq(schema.user.adminType, parsedType.data))
   }
   if (keyword) {
-    filters.push(or(ilike(schema.user.username, `%${keyword}%`), ilike(schema.userProfile.realName, `%${keyword}%`), ilike(schema.user.email, `%${keyword}%`))!)
+    filters.push(or(await usernameCondition(keyword), ilike(schema.userProfile.realName, `%${keyword}%`), ilike(schema.user.email, `%${keyword}%`))!)
   }
   // 班级：和全站班级下拉同一套值，NO_CLASS 是「没填班级」
   const className = c.req.query('className')?.trim()

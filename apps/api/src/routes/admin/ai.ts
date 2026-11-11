@@ -1,10 +1,11 @@
 import type { AdminAiReport, AdminAiReportList, AdminAiReportListItem, ToggleAiReportPinResponse } from '@oj2/contract'
-import { and, count, desc, eq, ilike } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireTeacher, type AppEnv } from '../../auth/middleware'
 import { db, schema } from '../../db'
 import { failure, success } from '../../http'
+import { usernameCondition } from '../../services/username-search'
 import { queryInteger } from '../helpers'
 
 export const adminAiRoutes = new Hono<AppEnv>()
@@ -38,7 +39,7 @@ const listColumns = {
 
 adminAiRoutes.get('/ai/reports', requireTeacher, async (c) => {
   const username = c.req.query('username')?.trim()
-  const where = username ? ilike(schema.user.username, `%${username}%`) : undefined
+  const where = username ? await usernameCondition(username) : undefined
 
   // 置顶列表不分页：它是「每个学生最新钉住的那份」，数量等于学生数，前端一次性拿走。
   // 但**形状必须和分页那支一样**：同一个 URL 返回两种形状，调用方没法照着一个类型写。

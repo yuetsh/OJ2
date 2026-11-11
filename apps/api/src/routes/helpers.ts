@@ -1,10 +1,11 @@
 import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from '@oj2/contract'
 
-import { and, count, eq, ilike, inArray, isNull, notInArray } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, notInArray } from 'drizzle-orm'
 
 import type { AuthUser } from '../auth/session'
 import { db, schema } from '../db'
 import { NON_FAILURE_RESULTS } from '../judge/status'
+import { usernameCondition } from '../services/username-search'
 
 /**
  * 用户对象的序列化层，对齐旧后端 `utils/api/_serializers.py` 的 `UsernameSerializer`。
@@ -173,7 +174,7 @@ export async function scopedUsers(username: string | undefined, className: strin
       adminType: schema.user.adminType,
     })
     .from(schema.user)
-    .where(and(className ? classCondition(className) : undefined, username ? ilike(schema.user.username, `%${username}%`) : undefined))
+    .where(and(className ? classCondition(className) : undefined, username ? await usernameCondition(username) : undefined))
 }
 
 export async function matchedUsers(username: string) {
@@ -186,7 +187,7 @@ export async function matchedUsers(username: string) {
       adminType: schema.user.adminType,
     })
     .from(schema.user)
-    .where(ilike(schema.user.username, `%${username}%`))
+    .where(await usernameCondition(username))
 }
 
 /**

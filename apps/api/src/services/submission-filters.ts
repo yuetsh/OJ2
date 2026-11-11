@@ -2,6 +2,7 @@ import { and, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 
 import { db, schema } from '../db'
 import { classCondition, parseDisplayIds } from '../routes/helpers'
+import { usernameCondition } from './username-search'
 
 /**
  * 两条提交列表（公开列表、比赛里的列表）的筛选条件：用户名、班级、题号。
@@ -12,7 +13,7 @@ import { classCondition, parseDisplayIds } from '../routes/helpers'
 /**
  * 两条提交列表的用户名筛选。**两边都要匹配**：
  *
- * - `user_id in (改过名的当前用户名匹配到的账号)` —— 老师用现在的班级前缀查
+ * - `user_id in (改过名的当前用户名匹配到的账号)`（含拼音，见 username-search.ts） —— 老师用现在的班级前缀查
  *   `ks248`，要能查出这个人改名之前交的那些（生产快照：比赛提交里有 685 条
  *   挂在旧名字下）；
  * - `submission.username ilike` —— 已删号的学生在 `user` 表里没有行，只剩提交里
@@ -29,7 +30,10 @@ import { classCondition, parseDisplayIds } from '../routes/helpers'
  */
 export async function usernameFilter(username: string) {
   const like = `%${username}%`
-  const users = await db.select({ id: schema.user.id }).from(schema.user).where(ilike(schema.user.username, like))
+  const users = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(await usernameCondition(username))
   const frozen = ilike(schema.submission.username, like)
   return users.length
     ? or(
