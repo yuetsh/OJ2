@@ -10,6 +10,7 @@ import {
   STUDENT_ROLES,
   createLabRequestSchema,
   labTrialRequestSchema,
+  reorderLabsRequestSchema,
   saveLabRequestSchema,
   type AdminLab,
   type AdminLabListItem,
@@ -17,7 +18,7 @@ import {
   type LabAssetPreview,
   type LabRunResult,
 } from '@oj2/contract'
-import { and, asc, countDistinct, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, countDistinct, eq, inArray, ne, sql } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 
 import { requireTeacher, type AppEnv } from '../../auth/middleware'
@@ -86,7 +87,7 @@ adminLabRoutes.get('/labs', requireTeacher, async (c) => {
       .from(schema.lab)
       .innerJoin(schema.user, eq(schema.lab.createdById, schema.user.id))
       .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
-      .orderBy(desc(schema.lab.updatedAt)),
+      .orderBy(asc(schema.lab.order), asc(schema.lab.id)),
     // 动过手的学生数：老师自己试的不算
     db
       .select({ labId: schema.labProgress.labId, students: countDistinct(schema.labProgress.userId) })
@@ -118,11 +119,34 @@ adminLabRoutes.post('/labs', requireTeacher, async (c) => {
   const parsed = await parseBody(c, createLabRequestSchema)
   if (!parsed.success) return parsed.response
   const now = new Date().toISOString()
+  // 新建的排最后
   const [created] = await db
     .insert(schema.lab)
-    .values({ title: parsed.data.title, createdById: c.get('user')!.id, createdAt: now, updatedAt: now })
+    .values({
+      title: parsed.data.title,
+      order: sql`(select coalesce(max("order"), 0) + 1 from "lab")`,
+      createdById: c.get('user')!.id,
+      createdAt: now,
+      updatedAt: now,
+    })
     .returning({ id: schema.lab.id })
   return success(c, (await serializeLab(created!.id))!, 201)
+})
+
+/** 拖动排序。路径不叫 /labs/order：会和下面的 /labs/:id 撞 */
+adminLabRoutes.put('/lab-order', requireTeacher, async (c) => {
+  const parsed = await parseBody(c, reorderLabsRequestSchema)
+  if (!parsed.success) return parsed.response
+  await db.transaction(async (tx) => {
+    for (const [index, id] of parsed.data.ids.entries()) {
+      // 排序不是内容修改，不动 updatedAt
+      await tx
+        .update(schema.lab)
+        .set({ order: index + 1 })
+        .where(eq(schema.lab.id, id))
+    }
+  })
+  return success(c, null)
 })
 
 adminLabRoutes.get('/labs/:id', requireTeacher, async (c) => {

@@ -73,7 +73,7 @@ labRoutes.get('/labs', optionalAuth, async (c) => {
     .from(schema.lab)
   const rows = await (passed ? query.leftJoin(passed, eq(passed.labId, schema.lab.id)) : query)
     .where(isTeacher(c) ? undefined : eq(schema.lab.isPublic, true))
-    .orderBy(desc(schema.lab.createdAt))
+    .orderBy(asc(schema.lab.order), asc(schema.lab.id))
   return success(c, rows satisfies LabListItem[])
 })
 

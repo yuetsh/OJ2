@@ -6,6 +6,7 @@ import {
   type AdminLessonList,
   type AdminLessonRequest,
   type CreateLabRequest,
+  type ReorderLabsRequest,
   type LabAsset,
   type LabAssetPreview,
   type LabRunResult,
@@ -821,6 +822,10 @@ export function deleteAdminLesson(id: number) {
 
 export function getAdminLabs() {
   return api.get<AdminLabListItem[]>('admin/labs')
+}
+
+export function reorderAdminLabs(ids: number[]) {
+  return api.put<null>('admin/lab-order', { ids } satisfies ReorderLabsRequest)
 }
 
 export function getAdminLab(id: number) {

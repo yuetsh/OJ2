@@ -61,6 +61,11 @@ export const createLabRequestSchema = z.object({
   title: z.string().trim().min(1).max(128),
 })
 
+/** 后台列表拖动排序：全部的 id 按新顺序排好整串交上来 */
+export const reorderLabsRequestSchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1).max(1000),
+})
+
 export const labAssetSchema = z.object({
   id: z.number().int(),
   name: z.string(),
@@ -271,6 +276,7 @@ export type LabFigureCheck = z.infer<typeof labFigureCheckSchema>
 export type LabStepInput = z.infer<typeof labStepInputSchema>
 export type SaveLabRequest = z.infer<typeof saveLabRequestSchema>
 export type CreateLabRequest = z.infer<typeof createLabRequestSchema>
+export type ReorderLabsRequest = z.infer<typeof reorderLabsRequestSchema>
 export type LabAsset = z.infer<typeof labAssetSchema>
 export type AdminLabStep = z.infer<typeof adminLabStepSchema>
 export type AdminLab = z.infer<typeof adminLabSchema>

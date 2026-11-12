@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import { Icon } from '@iconify/vue'
 import type { AdminLabListItem } from '@oj2/contract'
 import { NButton, NTag } from 'naive-ui'
 import UserName from 'shared/components/UserName.vue'
 import { errorMessage } from 'utils/api'
 import { parseTime } from 'utils/functions'
 import PageHeader from '../components/PageHeader.vue'
-import { createAdminLab, deleteAdminLab, getAdminLabs } from '../api'
+import { createAdminLab, deleteAdminLab, getAdminLabs, reorderAdminLabs } from '../api'
 
-/** 后台「数据分析」列表：一节一行。新建只问标题，建好直接进出题页（素材要挂在已有的一节下面） */
+/**
+ * 后台「数据分析」列表：一节一行，拖动排先后（学生列表照这个顺序）。
+ * 新建只问标题，建好直接进出题页（素材要挂在已有的一节下面），排在最后。
+ */
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
@@ -17,6 +21,45 @@ const loading = ref(true)
 const showCreate = ref(false)
 const newTitle = ref('')
 const creating = ref(false)
+const dragId = ref<number | null>(null)
+
+/** 学生那边看到的第几节：只数公开的 */
+const publicNo = computed(() => {
+  const no = new Map<number, number>()
+  labs.value.filter((lab) => lab.isPublic).forEach((lab, index) => no.set(lab.id, index + 1))
+  return no
+})
+
+async function drop(target: AdminLabListItem) {
+  const fromId = dragId.value
+  dragId.value = null
+  if (fromId === null || fromId === target.id) return
+  const fromIndex = labs.value.findIndex((lab) => lab.id === fromId)
+  const targetIndex = labs.value.findIndex((lab) => lab.id === target.id)
+  if (fromIndex < 0 || targetIndex < 0) return
+  // 先在本地换好位置，拖完立刻看到
+  const next = [...labs.value]
+  const [moved] = next.splice(fromIndex, 1)
+  next.splice(targetIndex, 0, moved!)
+  labs.value = next
+  try {
+    await reorderAdminLabs(next.map((lab) => lab.id))
+  } catch (err) {
+    message.error(errorMessage(err))
+    await load()
+  }
+}
+
+function rowProps(row: AdminLabListItem) {
+  return {
+    draggable: true,
+    class: dragId.value === row.id ? 'dragging' : undefined,
+    onDragstart: () => (dragId.value = row.id),
+    onDragend: () => (dragId.value = null),
+    onDragover: (e: DragEvent) => e.preventDefault(),
+    onDrop: () => drop(row),
+  }
+}
 
 async function load() {
   loading.value = true
@@ -60,6 +103,18 @@ function remove(lab: AdminLabListItem) {
 
 const columns: DataTableColumn<AdminLabListItem>[] = [
   {
+    title: '',
+    key: 'drag',
+    width: 36,
+    render: () => h('span', { class: 'handle', 'aria-hidden': 'true' }, h(Icon, { icon: 'ph:dots-six-vertical-bold', width: 16 })),
+  },
+  {
+    title: '#',
+    key: 'no',
+    width: 44,
+    render: (row) => h('span', { class: 'no' }, publicNo.value.get(row.id) ?? '—'),
+  },
+  {
     title: '标题',
     key: 'title',
     minWidth: 240,
@@ -98,7 +153,7 @@ onMounted(load)
     </template>
   </PageHeader>
 
-  <n-data-table :columns="columns" :data="labs" :loading="loading" :row-key="(row: AdminLabListItem) => row.id" />
+  <n-data-table :columns="columns" :data="labs" :loading="loading" :row-key="(row: AdminLabListItem) => row.id" :row-props="rowProps" />
 
   <n-modal v-model:show="showCreate" preset="card" title="新建一节" style="width: 440px" :bordered="false">
     <n-input v-model:value="newTitle" placeholder="标题，比如：用 pandas 分析班级成绩" maxlength="128" @keyup.enter="create" />
@@ -110,3 +165,19 @@ onMounted(load)
     </template>
   </n-modal>
 </template>
+
+<style scoped>
+:deep(.handle) {
+  display: flex;
+  opacity: 0.4;
+  cursor: grab;
+}
+:deep(.no) {
+  opacity: 0.6;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+:deep(tr.dragging) {
+  opacity: 0.35;
+}
+</style>

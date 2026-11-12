@@ -1482,6 +1482,8 @@ export const lab = pgTable(
     title: varchar({ length: 128 }).notNull(),
     description: text().default('').notNull(),
     isPublic: boolean('is_public').default(false).notNull(),
+    /** 后台拖动排的先后，学生列表和后台列表都按它排；新建的排最后 */
+    order: integer().default(0).notNull(),
     createdById: integer('created_by_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
