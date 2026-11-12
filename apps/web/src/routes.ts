@@ -117,6 +117,24 @@ export const ojs: RouteRecordRaw = {
       component: () => import('oj/learn/index.vue'),
     },
     {
+      path: 'lab',
+      name: 'labs',
+      component: () => import('oj/lab/index.vue'),
+    },
+    {
+      path: 'lab/:labID',
+      name: 'lab',
+      component: () => import('oj/lab/detail.vue'),
+      props: true,
+    },
+    {
+      path: 'lab/:labID/progress',
+      name: 'lab progress',
+      component: () => import('oj/lab/progress.vue'),
+      props: true,
+      meta: { requiresAuth: true, requiresTeacherAdmin: true },
+    },
+    {
       path: 'learn/:type/:step',
       name: 'learn tutorial',
       component: () => import('oj/learn/tutorial.vue'),
@@ -270,6 +288,19 @@ export const admins: RouteRecordRaw = {
       component: () => import('admin/announcement/detail.vue'),
       props: true,
       meta: { requiresSuperAdmin: true },
+    },
+    {
+      path: 'lab/list',
+      name: 'admin lab list',
+      component: () => import('admin/lab/list.vue'),
+      meta: { requiresTeacherAdmin: true },
+    },
+    {
+      path: 'lab/edit/:labID',
+      name: 'admin lab edit',
+      component: () => import('admin/lab/detail.vue'),
+      props: true,
+      meta: { requiresTeacherAdmin: true },
     },
     {
       path: 'tutorial/list',

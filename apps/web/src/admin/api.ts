@@ -1,4 +1,17 @@
-import { toAdminType, toProblemPermission, type AdminLessonList, type AdminLessonRequest } from '@oj2/contract'
+import {
+  toAdminType,
+  toProblemPermission,
+  type AdminLab,
+  type AdminLabListItem,
+  type AdminLessonList,
+  type AdminLessonRequest,
+  type CreateLabRequest,
+  type LabAsset,
+  type LabAssetPreview,
+  type LabRunResult,
+  type LabTrialRequest,
+  type SaveLabRequest,
+} from '@oj2/contract'
 import type {
   AddContestProblemRequest,
   ChallengeInput,
@@ -802,4 +815,48 @@ export function updateAdminLesson(id: number, body: AdminLessonRequest) {
 
 export function deleteAdminLesson(id: number) {
   return api.delete<null>(`admin/lessons/${id}`)
+}
+
+// ---------- 数据分析（lab） ----------
+
+export function getAdminLabs() {
+  return api.get<AdminLabListItem[]>('admin/labs')
+}
+
+export function getAdminLab(id: number) {
+  return api.get<AdminLab>(`admin/labs/${id}`)
+}
+
+export function createAdminLab(title: string) {
+  return api.post<AdminLab>('admin/labs', { title } satisfies CreateLabRequest)
+}
+
+export function saveAdminLab(id: number, body: SaveLabRequest) {
+  return api.put<AdminLab>(`admin/labs/${id}`, body)
+}
+
+export function deleteAdminLab(id: number) {
+  return api.delete<null>(`admin/labs/${id}`)
+}
+
+export function uploadLabAsset(labId: number, file: File) {
+  const form = new window.FormData()
+  form.append('file', file)
+  return api.post<LabAsset>(`admin/labs/${labId}/assets`, form)
+}
+
+export function deleteLabAsset(labId: number, assetId: number) {
+  return api.delete<null>(`admin/labs/${labId}/assets/${assetId}`)
+}
+
+export function getLabAssetPreview(labId: number, assetId: number) {
+  return api.get<LabAssetPreview>(`admin/labs/${labId}/assets/${assetId}/preview`)
+}
+
+export function labAssetFileUrl(labId: number, assetId: number) {
+  return `/api/admin/labs/${labId}/assets/${assetId}/file`
+}
+
+export function trialLabStep(labId: number, body: LabTrialRequest) {
+  return api.post<LabRunResult>(`admin/labs/${labId}/trial`, body)
 }

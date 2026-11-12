@@ -138,6 +138,8 @@ services:
         condition: service_healthy
     volumes:
       - ${DATA_DIR:-../data}/backend:/data
+      # 「数据分析」运行器的 unix socket（oj-lab 那边建、这边连）
+      - lab-run:/run/lab
     environment: &api-env
       DATABASE_URL: postgres://onlinejudge:${POSTGRES_PASSWORD:?}@oj-postgres:5432/onlinejudge
       # 密码拼进 URL，所以只能用 URL 安全的字符 —— 用 openssl rand -hex 32 生成
@@ -150,6 +152,7 @@ services:
       TRIAL_CONCURRENCY: ${TRIAL_CONCURRENCY:-2}
       AI_KEY: ${AI_KEY:-}
       AI_HINT_DIAGNOSE: ${AI_HINT_DIAGNOSE:-}
+      LAB_SOCKET: /run/lab/lab.sock
     healthcheck:
       test: ["CMD", "oj2-api", "healthcheck"]
       interval: 30s
@@ -203,3 +206,36 @@ services:
     ports:
       - "0.0.0.0:${WEB_PORT:-8080}:8000"
     mem_limit: 256m
+
+  oj-lab:
+    logging: *logging
+    # 「数据分析」的运行器（docker/lab/）：学生的 pandas / matplotlib 代码在这里跑。
+    # ⚠️ 和判题机一样是自建镜像、不在任何 registry 上：本机 docker/lab/build.sh --save，scp 过来 docker load。
+    #    deploy.sh 起栈前会查它在不在。
+    image: oj2-lab-1
+    container_name: oj-lab
+    restart: always
+    # 不联网：api 走 lab-run 卷里的 unix socket 连它，学生代码碰不到库、redis、api
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    volumes:
+      - lab-run:/run/lab
+    environment:
+      # socket 归 api 容器的用户（root），权限 0600，学生进程的 uid 连不上
+      LAB_SOCKET_UID: '0'
+      # 同时在处理的运行请求数，每个请求最多两个进程（对照答案时连老师的答案一起跑）。2 核，别开大
+      LAB_CONCURRENCY: ${LAB_CONCURRENCY:-3}
+    # 母进程是 root（要给每次运行换 uid），只留它用得上的几样权限
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, FOWNER, DAC_OVERRIDE, KILL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 256
+    # 母进程常驻约 120MB，每个学生进程在它之上最多再要 512MB 地址空间（实际用得远少于此）
+    mem_limit: 1g
+    # 课上一起点运行时，网页和查库先拿 CPU（oj-api、oj-postgres 都是 2048）
+    cpu_shares: 512
+
+volumes:
+  lab-run:

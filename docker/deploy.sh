@@ -122,6 +122,18 @@ if [ -n "$judge_image" ]; then
   ok "判题镜像 $judge_image 在本机"
 fi
 
+# ④ 「数据分析」运行器也是自建镜像，理由同上（docker/lab/README.md）
+lab_image=$(grep -m1 -E '^[[:space:]]*image: oj2-lab' <<<"$cfg" | awk '{print $2}' || true)
+if [ -n "$lab_image" ]; then
+  docker image inspect "$lab_image" >/dev/null 2>&1 \
+    || die "数据分析运行器镜像 $lab_image 不在这台机器上，而且 registry 上也没有（它是自建的）。
+  本机：docker/lab/build.sh --save
+        scp dist/$lab_image.tar root@这台机器:/root/OJDeploy/
+  这里：docker load -i /root/OJDeploy/$lab_image.tar
+见 docker/lab/README.md。"
+  ok "数据分析运行器镜像 $lab_image 在本机"
+fi
+
 port=$(grep -E '^WEB_PORT=' docker/.env | tail -1 | cut -d= -f2- || true)
 port=${port:-8080}
 ok "对外端口 $port"

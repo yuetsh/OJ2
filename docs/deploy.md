@@ -138,7 +138,7 @@ docker/deploy.sh --no-build   # 只改了 env / compose 时跳过构建
 代码怎么上到服务器不归它管（rsync 命令在脚本头部注释里）。
 
 脚本起栈前有一串自检，**每一条都是真撞到过的**：`DATA_DIR` 有没有生效、数据目录是不是
-一个 18 的库、判题镜像在不在。起完再跑四条冒烟，**题目数是 0 也中止**
+一个 18 的库、判题镜像和数据分析运行器镜像在不在。起完再跑四条冒烟，**题目数是 0 也中止**
 —— 那意味着连错库了。
 
 ### 判题镜像是自建的，不在 registry 上
@@ -158,6 +158,15 @@ docker load -i /root/OJDeploy/oj2-judge-3.tar
 
 忘了这一步，`deploy.sh` 起栈时会去 pull 一个不存在的镜像并失败（响亮地失败，
 不会静默降级）。构建、回滚和工具链版本表见 `docker/judge/README.md`。
+
+### 「数据分析」运行器也是自建镜像
+
+`compose.debian.yml` 里的 `oj-lab`（镜像 `oj2-lab-1`）跑学生在「数据分析」里写的 pandas /
+matplotlib 代码，和判题机同一个路数：本机 `docker/lab/build.sh --save`，scp 过去 `docker load`。
+`deploy.sh` 起栈前会查它在不在，不在就停下并给出这三条命令。**第一次上「数据分析」时必须先 load
+它再 push**，否则 CI 部署会停在这道自检上。它不联网，和 api 之间走 `lab-run` 卷里的 unix socket；
+上线后在服务器上跑一次 `LAB_SOCKET=… bun docker/lab/smoke.ts` 量 2 核上的真实耗时。细节见
+`docker/lab/README.md`。机房那套还没部署（见下），compose.school.yml 没加它。
 
 ### 迁移在起栈之前跑
 

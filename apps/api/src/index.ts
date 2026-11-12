@@ -20,6 +20,7 @@ import { flowchartRoutes } from './routes/flowchart'
 import { problemRoutes } from './routes/problem'
 import { problemStatsRoutes } from './routes/problem-stats'
 import { submissionRoutes } from './routes/submission'
+import { labRoutes } from './routes/lab'
 import { trialRunRoutes } from './routes/trial-run'
 import { mascotRoutes } from './routes/mascot'
 import { siteRoutes } from './routes/site'
@@ -45,6 +46,7 @@ app.route('/api', problemRoutes)
 app.route('/api', problemStatsRoutes)
 app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
+app.route('/api', labRoutes)
 app.route('/api', mascotRoutes)
 app.route('/api/admin', adminRoutes)
 

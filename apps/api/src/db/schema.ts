@@ -44,6 +44,9 @@ import type {
   FlowchartStatus,
   HintDiagnosis,
   JudgeStatus,
+  LabCheckKind,
+  LabFigureCheck,
+  LabStepKind,
   LessonLanguage,
   LessonMode,
   MascotEventKind,
@@ -73,8 +76,14 @@ import {
   varchar,
   unique,
   uniqueIndex,
+  customType,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
+
+// drizzle-orm 0.45 的 pg-core 还没有 bytea，postgres.js 读出来是 Buffer
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+})
 
 export const aiAnalysis = pgTable(
   'ai_analysis',
@@ -1451,6 +1460,154 @@ export const mascotEvent = pgTable(
       columns: [table.userId],
       foreignColumns: [user.id],
       name: 'mascot_event_user_id_fk_user_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 「数据分析」的一节（代码里叫 lab），设计见 docs/specs/2026-11-12-data-analysis-lab-design.md。
+ * 下面挂 lab_step（步骤）、lab_asset（素材）、lab_progress（学生每一步的代码和对错）。
+ */
+export const lab = pgTable(
+  'lab',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'lab_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    title: varchar({ length: 128 }).notNull(),
+    description: text().default('').notNull(),
+    isPublic: boolean('is_public').default(false).notNull(),
+    createdById: integer('created_by_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    // 出题人：删用户要拦住（和题目、教程一样），不跟着把老师出的课删掉
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [user.id],
+      name: 'lab_created_by_id_fk_user_id',
+    }),
+  ],
+)
+
+/**
+ * 一节里的一步。`referenceCode` 是答案：对照答案时后面的步骤拿前面各步的答案接着跑，学生做对后也能看。
+ * 检查方式的三种见契约 LAB_CHECK_KINDS。步骤是一节的组成部分，lab 外键 CASCADE。
+ */
+export const labStep = pgTable(
+  'lab_step',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'lab_step_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    labId: integer('lab_id').notNull(),
+    order: integer().notNull(),
+    kind: text().$type<LabStepKind>().notNull(),
+    title: varchar({ length: 128 }).notNull(),
+    description: text().default('').notNull(),
+    starterCode: text('starter_code').default('').notNull(),
+    referenceCode: text('reference_code').default('').notNull(),
+    checkKind: text('check_kind').$type<LabCheckKind>().notNull(),
+    compareVars: jsonb('compare_vars').$type<string[]>().default([]).notNull(),
+    compareFigure: jsonb('compare_figure').$type<LabFigureCheck | null>(),
+    checkScript: text('check_script').default('').notNull(),
+  },
+  (table) => [
+    index('lab_step_lab_id_idx').on(table.labId, table.order),
+    foreignKey({
+      columns: [table.labId],
+      foreignColumns: [lab.id],
+      name: 'lab_step_lab_id_fk_lab_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 素材文件（老师上传的 Excel / CSV）。**存在库里**，不落磁盘：文件小（单个 ≤ 5MB）、可能带学生真名
+ * 不能放进公开的 upload 目录、跟着数据库备份走，也不用给 api 容器多挂目录。
+ * 只增不改：替换 = 删旧的、插新的（新 id），所以 api 可以按 id 放心缓存内容。
+ */
+export const labAsset = pgTable(
+  'lab_asset',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'lab_asset_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    labId: integer('lab_id').notNull(),
+    name: varchar({ length: 100 }).notNull(),
+    size: integer().notNull(),
+    data: bytea().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    unique('lab_asset_lab_id_name_key').on(table.labId, table.name),
+    foreignKey({
+      columns: [table.labId],
+      foreignColumns: [lab.id],
+      name: 'lab_asset_lab_id_fk_lab_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 学生 × 步骤一行：最新的代码、运行了几次、第一次做对的时间、最近一次没过的原因。
+ * 和 exercise_attempt 一样存聚合不存流水 —— 运行只是试，不是提交（设计文档第 5 节）。
+ * 运行结果（表、图）不存：老师要看时拿存着的代码现跑一遍，运行器快，用不着占库。
+ *
+ * `lastFailure` 是进度页分组用的那句话（「图里应该是 4 根柱子…」/ 报错的异常名），做对了就清空。
+ * 开放步骤交的东西：`openText` 一句话 + `openCode` 交的那一刻的代码（图由它现跑出来）。
+ */
+export const labProgress = pgTable(
+  'lab_progress',
+  {
+    userId: integer('user_id').notNull(),
+    stepId: integer('step_id').notNull(),
+    // 冗余一份，进度页按节查不用再连 lab_step
+    labId: integer('lab_id').notNull(),
+    code: text().default('').notNull(),
+    runs: integer().default(0).notNull(),
+    lastRunAt: timestamp('last_run_at', { withTimezone: true, mode: 'string' }),
+    passedAt: timestamp('passed_at', { withTimezone: true, mode: 'string' }),
+    lastFailure: text('last_failure'),
+    openText: text('open_text'),
+    openCode: text('open_code'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'string' }),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.stepId], name: 'lab_progress_pkey' }),
+    index('lab_progress_lab_id_idx').on(table.labId),
+    // 和 exercise_attempt 同一档：账号、步骤没了，这些留痕就没意义
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: 'lab_progress_user_id_fk_user_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.stepId],
+      foreignColumns: [labStep.id],
+      name: 'lab_progress_step_id_fk_lab_step_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.labId],
+      foreignColumns: [lab.id],
+      name: 'lab_progress_lab_id_fk_lab_id',
     }).onDelete('cascade'),
   ],
 )

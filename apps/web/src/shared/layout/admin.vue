@@ -76,6 +76,13 @@ const NAV: NavGroup[] = [
         to: '/admin/tutorial/list',
         role: 'super',
       },
+      {
+        label: '数据分析',
+        icon: 'ph:chart-bar',
+        path: '/admin/lab',
+        to: '/admin/lab/list',
+        role: 'teacher',
+      },
     ],
   },
   {

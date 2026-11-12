@@ -316,6 +316,13 @@
       "when": 1793695621303,
       "tag": "0044_achievement_more_tiers",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794484247787,
+      "tag": "0045_lab",
+      "breakpoints": true
     }
   ]
 }

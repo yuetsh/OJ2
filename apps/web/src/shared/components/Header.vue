@@ -97,6 +97,7 @@ const navLinks = computed<NavLink[]>(() =>
   [
     { key: 'home', label: '首页', to: '/', show: userStore.isAuthed },
     { key: 'learn', label: '自学', to: '/learn' },
+    { key: 'lab', label: '数据分析', to: '/lab' },
     { key: 'problem', label: '题目', to: '/problem' },
     { key: 'submission', label: '提交', to: '/submission', show: userStore.showSubmissions },
     { key: 'problemset', label: '专题', to: '/problemset' },
