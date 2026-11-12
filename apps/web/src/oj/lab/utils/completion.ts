@@ -16,11 +16,21 @@ import { enhanceCompletion } from 'shared/extensions/autocompletion'
 
 type Item = { label: string; detail: string; info?: string; call?: string; property?: boolean }
 
-/** 函数项：插入 `名字()`，光标停在括号里（和题目页那套一样） */
+/**
+ * 函数项：插入 `名字()`，光标停在括号里（和题目页那套一样）。带了空引号 / 空方括号 / 空花括号的
+ * （`read_excel('')`、`concat([])`、`rename(columns={})`），光标停在头一对空的中间，接着就能打文件名
+ */
+function cursorOffset(insert: string) {
+  const empty = insert.search(/''|""|\[\]|\{\}|\(\)/)
+  if (empty >= 0) return empty + 1
+  const paren = insert.indexOf('(')
+  return paren >= 0 ? paren + 1 : insert.length
+}
+
 function toCompletion(item: Item, boost = 0): Completion {
   if (item.property) return { label: item.label, detail: item.detail, info: item.info, type: 'property', boost }
   const insert = item.call ?? `${item.label}()`
-  const cursor = insert.indexOf('(') + 1
+  const cursor = cursorOffset(insert)
   return {
     label: item.label,
     detail: item.detail,
@@ -28,7 +38,7 @@ function toCompletion(item: Item, boost = 0): Completion {
     type: 'function',
     boost,
     apply: (view: EditorView, _c: Completion, from: number, to: number) => {
-      view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + (cursor > 0 ? cursor : insert.length) } })
+      view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + cursor } })
     },
   }
 }
