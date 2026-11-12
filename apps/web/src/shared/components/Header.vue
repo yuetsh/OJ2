@@ -80,7 +80,7 @@ function renderIcon(icon: string) {
  * 顶栏导航的唯一一张表：桌面端渲染成一排纯文字，窄屏收进「菜单」下拉。
  * `key` 就是一级路径，用来判定高亮（见上面的 active）。
  *
- * 顺序是 首页 / 自学 / 题目 / 提交 / 专题 / 比赛 / 排名 / 公告。「首页」只给登录了的：没登录时根路径
+ * 顺序是 首页 / 自学 / 题目 / 提交 / 专题 / 比赛 / 排名 / 公告 / 实验室（下拉，见 labLinks）。「首页」只给登录了的：没登录时根路径
  * 就是题目列表，和「题目」是同一页（2026-11-03 用户要的，原来只能点左上角的站名回首页）。「自学」进自学首页（/learn），
  * 两门课、接着学哪一课都在那儿挑，不再是下拉。提交留在一级：学生天天回来看自己交的结果，老师课上翻全班代码也走它。
  * 公告 2026-10-13 回到顶栏（用户要的）：首页只放置顶那条了，别的公告得有个地方点得到。
@@ -97,7 +97,6 @@ const navLinks = computed<NavLink[]>(() =>
   [
     { key: 'home', label: '首页', to: '/', show: userStore.isAuthed },
     { key: 'learn', label: '自学', to: '/learn' },
-    { key: 'lab', label: '数据分析', to: '/lab' },
     { key: 'problem', label: '题目', to: '/problem' },
     { key: 'submission', label: '提交', to: '/submission', show: userStore.showSubmissions },
     { key: 'problemset', label: '专题', to: '/problemset' },
@@ -107,10 +106,21 @@ const navLinks = computed<NavLink[]>(() =>
   ].filter((link) => link.show !== false),
 )
 
-const mobileMenus = computed<DropdownOption[]>(() => navLinks.value.map((link) => ({ label: link.label, key: link.key })))
+/**
+ * 排在最后的「实验室」：点开是下拉，放不是天天做题的新玩法（2026-11-12 用户要的，第一个是「数据分析」）。
+ * key 同样是一级路径，下拉里任一项是当前页时「实验室」亮着。
+ */
+const labLinks: NavLink[] = [{ key: 'lab', label: '数据分析', to: '/lab' }]
+const labMenu: DropdownOption[] = labLinks.map((link) => ({ label: link.label, key: link.key }))
+const labActive = computed(() => labLinks.some((link) => link.key === active.value))
+
+const mobileMenus = computed<DropdownOption[]>(() => [
+  ...navLinks.value.map((link) => ({ label: link.label, key: link.key })),
+  { type: 'group', label: '实验室', key: 'lab-group', children: labMenu },
+])
 
 function handleNavSelect(key: string) {
-  const link = navLinks.value.find((item) => item.key === key)
+  const link = [...navLinks.value, ...labLinks].find((item) => item.key === key)
   if (link) router.push(link.to)
 }
 
@@ -215,6 +225,12 @@ const options = computed<Array<DropdownOption | DropdownDividerOption>>(() => {
       <RouterLink v-for="link in navLinks" :key="link.key" :to="link.to" class="nav-link" :class="{ active: active === link.key }">
         {{ link.label }}
       </RouterLink>
+      <n-dropdown trigger="click" :options="labMenu" size="large" @select="handleNavSelect">
+        <button type="button" class="nav-link" :class="{ active: labActive }">
+          实验室
+          <Icon icon="ph:caret-down-bold" :width="11" />
+        </button>
+      </n-dropdown>
     </nav>
     <div class="spacer"></div>
     <div class="actions">
