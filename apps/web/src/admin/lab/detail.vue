@@ -9,6 +9,7 @@ import LabOutputs from 'oj/lab/components/LabOutputs.vue'
 import LabTable from 'oj/lab/components/LabTable.vue'
 import LabVerdict from 'oj/lab/components/LabVerdict.vue'
 import { downloadFile } from 'oj/lab/utils/download'
+import { labCompletion } from 'oj/lab/utils/completion'
 import PageHeader from '../components/PageHeader.vue'
 import PreviewStrip from '../problem/components/PreviewStrip.vue'
 import { usePreviewCollapsed } from '../problem/components/previewCollapse'
@@ -75,6 +76,21 @@ const dirty = computed(() => lab.value !== null && snapshot() !== baseline)
 async function load() {
   toForm(await getAdminLab(labId.value))
   openKey.value = form.steps[0]?.key ?? null
+  assets.value.forEach(loadColumns)
+}
+
+/** 补全里的列名：表格类素材的表头。进页面读一遍，上传新素材后也读 */
+const assetColumns = ref(new Map<number, string[]>())
+const completion = labCompletion(() => [...assetColumns.value.values()].flat())
+
+async function loadColumns(asset: LabAsset) {
+  if (!/\.(xlsx|csv)$/i.test(asset.name)) return
+  try {
+    const p = await getLabAssetPreview(labId.value, asset.id)
+    if (p.table) assetColumns.value = new Map(assetColumns.value).set(asset.id, p.table.columns)
+  } catch {
+    // 读不出来就没有列名补全，不影响出题
+  }
 }
 
 async function save() {
@@ -256,6 +272,7 @@ async function onPickFile(event: Event) {
   try {
     const asset = await uploadLabAsset(labId.value, file)
     assets.value = [...assets.value.filter((a) => a.name !== asset.name), asset].sort((a, b) => a.name.localeCompare(b.name))
+    loadColumns(asset)
   } catch (err) {
     message.error(errorMessage(err, '没传上'))
   } finally {
@@ -273,6 +290,9 @@ function removeAsset(asset: LabAsset) {
       try {
         await deleteLabAsset(labId.value, asset.id)
         assets.value = assets.value.filter((a) => a.id !== asset.id)
+        const columns = new Map(assetColumns.value)
+        columns.delete(asset.id)
+        assetColumns.value = columns
       } catch (err) {
         message.error(errorMessage(err))
       }
@@ -378,7 +398,13 @@ onMounted(load)
 
           <div class="field">
             <span class="label">学生拿到的初始代码</span>
-            <CodeEditor v-model:value="step.starterCode" language="Python" :font-size="14" :height="codeHeight(step.starterCode, 2, 10)" />
+            <CodeEditor
+              v-model:value="step.starterCode"
+              :completion="completion"
+              language="Python"
+              :font-size="14"
+              :height="codeHeight(step.starterCode, 2, 10)"
+            />
           </div>
 
           <template v-if="step.kind === 'normal'">
@@ -397,7 +423,13 @@ onMounted(load)
                 <span class="grow"></span>
                 <n-text depth="3" class="small">学生做对后能看到</n-text>
               </div>
-              <CodeEditor v-model:value="step.referenceCode" language="Python" :font-size="14" :height="codeHeight(step.referenceCode, 3, 16)" />
+              <CodeEditor
+                v-model:value="step.referenceCode"
+                :completion="completion"
+                language="Python"
+                :font-size="14"
+                :height="codeHeight(step.referenceCode, 3, 16)"
+              />
             </div>
 
             <template v-if="step.checkKind === 'compare'">
@@ -429,6 +461,7 @@ onMounted(load)
               <span class="label">检查脚本</span>
               <CodeEditor
                 v-model:value="step.checkScript"
+                :completion="completion"
                 language="Python"
                 :font-size="14"
                 :height="codeHeight(step.checkScript, 3, 12)"

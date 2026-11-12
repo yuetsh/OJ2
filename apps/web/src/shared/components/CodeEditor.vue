@@ -2,7 +2,7 @@
 import { bracketMatching } from '@codemirror/language'
 import CodeMirror from './CodeMirror.vue'
 import type { Extension } from '@codemirror/state'
-import { autocompletion, closeBrackets, completeAnyWord } from '@codemirror/autocomplete'
+import { autocompletion, closeBrackets, completeAnyWord, type CompletionSource } from '@codemirror/autocomplete'
 import type { LANGUAGE } from 'utils/types'
 import { darkCodeTheme, lightCodeTheme } from '../themes/codeTheme'
 import { styleTheme } from 'shared/extensions/baseTheme'
@@ -17,9 +17,11 @@ interface Props {
   placeholder?: string
   /** 追加的 CodeMirror 扩展。传一个稳定的数组实例，每次渲染新建会让编辑器反复重配 */
   extraExtensions?: Extension[]
+  /** 换掉默认的补全来源（Python / C 的中文提示那套）。「数据分析」用它补 pandas、matplotlib 和素材的列名 */
+  completion?: CompletionSource
 }
 
-const { language = 'Python', fontSize = 20, height = '100%', readonly = false, placeholder = '', extraExtensions = [] } = defineProps<Props>()
+const { language = 'Python', fontSize = 20, height = '100%', readonly = false, placeholder = '', extraExtensions = [], completion } = defineProps<Props>()
 const code = defineModel<string>('value')
 
 const isDark = useDark()
@@ -32,7 +34,7 @@ const extensions = computed(() => [
   bracketMatching(),
   closeBrackets(),
   autocompletion({
-    override: [enhanceCompletion(language), completeAnyWord],
+    override: [completion ?? enhanceCompletion(language), completeAnyWord],
   }),
   isDark.value ? darkCodeTheme : lightCodeTheme,
   ...extraExtensions,

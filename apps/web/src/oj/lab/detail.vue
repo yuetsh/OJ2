@@ -13,6 +13,7 @@ import LabTable from './components/LabTable.vue'
 import LabVerdict from './components/LabVerdict.vue'
 import { downloadFile } from './utils/download'
 import { labLineMarkExtensions, markLine } from './utils/lineMark'
+import { labCompletion } from './utils/completion'
 
 /**
  * 学生做一节「数据分析」，照画布 LabStudent：一页从头排到底（拍板：不做一次一步、不自动折叠）。
@@ -171,6 +172,9 @@ function toggleAsset(id: number) {
   expanded.value = next
 }
 
+/** 补全里的列名：素材表的表头（预览读出来的那几张） */
+const completion = labCompletion(() => [...previews.value.values()].flatMap((t) => t?.columns ?? []))
+
 async function download(asset: LabAsset) {
   if (!(await downloadFile(studentLabAssetUrl(labId.value, asset.id), asset.name))) message.error('下载失败')
 }
@@ -258,6 +262,7 @@ onMounted(load)
               :font-size="16"
               height="auto"
               :extra-extensions="labLineMarkExtensions"
+              :completion="completion"
               @update:value="(v: string | undefined) => onCodeChange(index, v ?? '')"
             />
           </div>
