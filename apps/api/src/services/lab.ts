@@ -19,26 +19,85 @@ export class LabBusyError extends Error {}
 const RUN_TIMEOUT_MS = 90_000
 
 export interface LabRunnerRequest {
-  assets: { name: string; data: string }[]
+  /** id 只给 api 自己算缓存键用（素材只增不改，同一个 id 内容不变），运行器不看 */
+  assets: { id?: number; name: string; data: string }[]
   steps: string[]
   reference?: string[]
   check: { kind: 'none' } | { kind: 'compare'; vars: string[]; figure: LabFigureCheck | null } | { kind: 'script'; script: string }
+  /** 缓存着的答案比对数据：带了运行器就不再跑答案 */
+  referenceResult?: unknown
 }
 
+/** 运行器多回的一个字段：这次真跑了答案时，答案的比对数据（变量、图的指纹，不含图片）。形状只有运行器认，原样存原样带 */
+type RunnerResponse = LabRunResult & { referenceResult?: unknown }
+
 const inFlight = new Set<number>()
+
+/**
+ * 答案的比对数据按「答案代码 + 检查方式 + 素材」缓存。对照答案时答案对全班都一样，
+ * 不缓存的话每个学生每次运行都要把答案再跑一遍 —— 2 核的服务器上 40 人同时运行，最后一个等 18 秒
+ * （2026-11-12 线上实测），一半的 CPU 花在重复跑同一份答案上。
+ * 出题页「试跑」用的是编辑器里还没存的答案，键里带着代码本身，改一个字就是另一个键，不会串。
+ */
+const REFERENCE_CACHE_LIMIT = 300
+const referenceCache = new Map<string, unknown>()
+/** 同一个键第一次被同时点的时候，只让第一个人跑答案，其余的等它的结果 */
+const referencePending = new Map<string, Promise<unknown>>()
+
+function referenceKey(request: LabRunnerRequest): string | null {
+  if (request.check.kind !== 'compare' || !request.reference) return null
+  const assets = request.assets.map((a) => a.id ?? `${a.name}:${Bun.hash(a.data)}`)
+  return String(Bun.hash(JSON.stringify([request.reference, request.check, assets])))
+}
+
+function rememberReference(key: string, value: unknown) {
+  referenceCache.delete(key)
+  referenceCache.set(key, value)
+  for (const oldKey of referenceCache.keys()) {
+    if (referenceCache.size <= REFERENCE_CACHE_LIMIT) break
+    referenceCache.delete(oldKey)
+  }
+}
+
+function strip({ referenceResult: _ref, ...result }: RunnerResponse): LabRunResult {
+  return result
+}
 
 /** 发一次运行。同一个人同时只能有一次在跑（运行器那边总共就三个名额）。 */
 export async function runLab(userId: number, request: LabRunnerRequest): Promise<LabRunResult> {
   if (inFlight.has(userId)) throw new LabBusyError()
   inFlight.add(userId)
   try {
-    return await callRunner(request)
+    const key = referenceKey(request)
+    if (!key) return strip(await callRunner(request))
+
+    let cached = referenceCache.get(key)
+    if (cached === undefined) cached = (await referencePending.get(key)) ?? undefined
+    if (cached !== undefined) {
+      rememberReference(key, cached)
+      return strip(await callRunner({ ...request, referenceResult: cached }))
+    }
+
+    let settle: (value: unknown) => void = () => {}
+    referencePending.set(key, new Promise((resolve) => (settle = resolve)))
+    try {
+      const result = await callRunner(request)
+      // 答案跑不通（referenceError）时运行器不给，下次照样重跑 —— 老师改好答案就对了
+      if (result.referenceResult) rememberReference(key, result.referenceResult)
+      settle(result.referenceResult)
+      return strip(result)
+    } catch (error) {
+      settle(undefined)
+      throw error
+    } finally {
+      referencePending.delete(key)
+    }
   } finally {
     inFlight.delete(userId)
   }
 }
 
-async function callRunner(request: LabRunnerRequest): Promise<LabRunResult> {
+async function callRunner(request: LabRunnerRequest): Promise<RunnerResponse> {
   let res: Response
   try {
     res = await fetch('http://lab/run', {
@@ -53,7 +112,7 @@ async function callRunner(request: LabRunnerRequest): Promise<LabRunResult> {
   }
   if (!res.ok) throw new LabRunnerError(`运行器回了 HTTP ${res.status}：${await res.text()}`)
   // 运行器回的就是契约 labRunResultSchema 的形状（docker/lab/runner.py 的 handle_run），不再 parse
-  return (await res.json()) as LabRunResult
+  return (await res.json()) as RunnerResponse
 }
 
 // ---------------------------------------------------------------- 素材
@@ -80,7 +139,7 @@ export async function labAssetsPayload(labId: number) {
     const data = await db.select({ id: schema.labAsset.id, data: schema.labAsset.data }).from(schema.labAsset).where(inArray(schema.labAsset.id, missing))
     for (const row of data) rememberAsset(row.id, Buffer.from(row.data).toString('base64'))
   }
-  return rows.map((row) => ({ name: row.name, data: assetCache.get(row.id) ?? '' }))
+  return rows.map((row) => ({ id: row.id, name: row.name, data: assetCache.get(row.id) ?? '' }))
 }
 
 /** 素材文件名：直接当文件名写进运行目录，学生代码里也按它读 */

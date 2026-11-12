@@ -259,14 +259,45 @@ WordCloud(width=400, height=200, background_color='white').generate(words)`
   return r.ok && r.outputs.some((o) => o.kind === 'image') ? null : JSON.stringify(r.error ?? r.outputs)
 })
 
+console.log('\n答案缓存（api 记住 referenceResult，之后带过来就不再跑答案）')
+let referenceResult: unknown = null
+await test('真跑了答案时回 referenceResult，带回去判得一样', async () => {
+  const first = (await run({ steps: [step1, step2, step3Wrong], reference: [step1, step2, step3], check: compareFig })) as RunResult & {
+    referenceResult?: unknown
+  }
+  if (!first.referenceResult) return '没回 referenceResult'
+  referenceResult = first.referenceResult
+  const again = (await run({ steps: [step1, step2, step3Wrong], reference: [step1, step2, step3], check: compareFig, referenceResult })) as RunResult & {
+    referenceResult?: unknown
+  }
+  if (again.referenceResult) return '带了缓存还回 referenceResult（说明又跑了一遍答案）'
+  return JSON.stringify(again.check) === JSON.stringify(first.check) && again.referenceSummary === first.referenceSummary
+    ? null
+    : `两次不一样：${JSON.stringify(first.check)} / ${JSON.stringify(again.check)}`
+})
+await test('答案跑不通时不回 referenceResult（不该被缓存）', async () => {
+  const r = (await run({ steps: [step1, step2], reference: [step1, 'avg = 1 / 0'], check: compareAvg })) as RunResult & { referenceResult?: unknown }
+  return r.referenceResult ? '答案报错了还回了 referenceResult' : null
+})
+
 console.log('\n并发')
-for (const n of [1, 10, 40]) {
-  await test(`${n} 个人同时点第 3 步的运行（对照答案，每人两个进程）`, async () => {
+for (const [n, cached] of [
+  [1, false],
+  [10, false],
+  [40, false],
+  [40, true],
+] as const) {
+  await test(`${n} 个人同时点第 3 步的运行（对照答案，${cached ? '答案已缓存，每人一个进程' : '每人两个进程'}）`, async () => {
     const t0 = performance.now()
     const done: number[] = []
     const results = await Promise.all(
       Array.from({ length: n }, () =>
-        run({ steps: [step1, step2, step3Wrong], reference: [step1, step2, step3], check: compareFig }).then((r) => {
+        run({
+          steps: [step1, step2, step3Wrong],
+          reference: [step1, step2, step3],
+          check: compareFig,
+          ...(cached ? { referenceResult } : {}),
+        }).then((r) => {
           done.push(performance.now() - t0)
           return r
         }),

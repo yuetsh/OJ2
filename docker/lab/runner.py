@@ -253,12 +253,20 @@ def parse_request(body):
             raise BadRequest('对照答案至少要比一个变量或比图')
     if kind == 'script' and not isinstance(check.get('script'), str):
         raise BadRequest('检查脚本要是一段代码')
-    return steps, reference, assets, check
+
+    # api 缓存的答案比对数据（之前某次运行回的 referenceResult）。带了就不再跑答案
+    cached = req.get('referenceResult')
+    if cached is not None:
+        if kind != 'compare' or not isinstance(cached, dict) or not {'error', 'vars', 'figures'} <= cached.keys():
+            raise BadRequest('referenceResult 的形状不对')
+        if not isinstance(cached['vars'], dict) or any(n not in cached['vars'] for n in check.get('vars') or []):
+            raise BadRequest('referenceResult 里缺要比的变量')
+    return steps, reference, assets, check, cached
 
 
 def handle_run(body):
     t0 = time.monotonic()
-    steps, reference, assets, check = parse_request(body)
+    steps, reference, assets, check, cached = parse_request(body)
     kind = check['kind']
     want = {
         'vars': (check.get('vars') or []) if kind == 'compare' else [],
@@ -266,9 +274,13 @@ def handle_run(body):
     }
     stu_job = dict(want, steps=steps, script=check.get('script') if kind == 'script' else None)
     runs = [spawn(stu_job, assets)]
-    if kind == 'compare':
+    # 对照答案：答案对全班都一样，api 记住它的比对数据（referenceResult），之后带过来就不再跑 ——
+    # 2 核的服务器上这能省掉将近一半的 CPU（40 人同时运行实测见 README）
+    if kind == 'compare' and cached is None:
         runs.append(spawn(dict(want, steps=reference, script=None), assets))
     results = wait_all(runs)
+    if kind == 'compare' and cached is not None:
+        results.append((cached, None))
 
     stu, stu_fail = results[0]
     last = len(steps)
@@ -280,6 +292,8 @@ def handle_run(body):
         'check': None,
         'referenceError': None,
         'referenceSummary': None,
+        # 这次真跑了答案、而且答案跑通了，就把比对数据交回去给 api 缓存（不含图片，只有指纹）
+        'referenceResult': None,
     }
     if stu_fail:
         resp['error'] = failure_error(stu_fail, last)
@@ -301,6 +315,8 @@ def handle_run(body):
                 resp['referenceError'] = {'step': last, 'type': 'Missing', 'message': f'答案里没有 {missing[0]}', 'line': None, 'traceback': ''}
             if want['figure']:
                 resp['referenceSummary'] = compare.describe_figures(ref['figures'])
+            if cached is None and not missing:
+                resp['referenceResult'] = {'error': None, 'vars': ref['vars'], 'figures': ref['figures']}
         if resp['ok'] and not resp['referenceError']:
             msgs = compare.compare(ref, stu, check)
             resp['check'] = {'passed': not msgs, 'messages': msgs}
@@ -315,7 +331,8 @@ def handle_run(body):
 
     resp['timeMs'] = round((time.monotonic() - t0) * 1000)
     passed = resp['check']['passed'] if resp['check'] else None
-    log(f'run steps={len(steps)} check={kind} ok={resp["ok"]} passed={passed} {resp["timeMs"]}ms')
+    ref_note = ' ref=cached' if cached is not None else ''
+    log(f'run steps={len(steps)} check={kind}{ref_note} ok={resp["ok"]} passed={passed} {resp["timeMs"]}ms')
     return resp
 
 

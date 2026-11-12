@@ -95,7 +95,7 @@ services:
   lab:
     logging: *logging
     # 「数据分析」的运行器（docker/lab/）。和 judge 一样是本机构建的镜像：docker/lab/build.sh
-    image: oj2-lab-1
+    image: oj2-lab-2
     container_name: oj2-lab
     restart: unless-stopped
     # 不联网：api 走下面那个目录里的 unix socket 连它。学生代码因此碰不到库、redis、api

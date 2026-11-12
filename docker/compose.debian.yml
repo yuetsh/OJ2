@@ -212,7 +212,7 @@ services:
     # 「数据分析」的运行器（docker/lab/）：学生的 pandas / matplotlib 代码在这里跑。
     # ⚠️ 和判题机一样是自建镜像、不在任何 registry 上：本机 docker/lab/build.sh --save，scp 过来 docker load。
     #    deploy.sh 起栈前会查它在不在。
-    image: oj2-lab-1
+    image: oj2-lab-2
     container_name: oj-lab
     restart: always
     # 不联网：api 走 lab-run 卷里的 unix socket 连它，学生代码碰不到库、redis、api

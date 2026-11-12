@@ -14,9 +14,9 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
-# **改了库版本、字体或 runner 的代码就把末尾序号 +1**（下一版叫 oj2-lab-2），别在同一个名字上重建 ——
+# **改了库版本、字体或 runner 的代码就把末尾序号 +1**（下一版叫 oj2-lab-3），别在同一个名字上重建 ——
 # compose 的 `up -d` 不带 --pull，名字没变就会静默用机器上的旧镜像。
-IMAGE=oj2-lab-1
+IMAGE=oj2-lab-2
 
 SAVE=0
 BUILD_ARGS=()
