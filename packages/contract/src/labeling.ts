@@ -9,9 +9,10 @@ import { sampleUserSchema } from './common'
  * 三种类型，一节只放一种：
  * - text：文字分类，一条文字选一个标签；
  * - image：图片分类，一张图选一个标签；
- * - span：实体标注，在一句话里标出几段字（人名、地名…），每段一个类别。
+ * - span：实体标注，在一句话里标出几段字（人名、地名…），每段一个类别；
+ * - box：框选，在一张图上框出所有要标的东西，每个框一个类别（设计文档 3.6 节，只做电脑）。
  */
-export const LABELING_KINDS = ['text', 'image', 'span'] as const
+export const LABELING_KINDS = ['text', 'image', 'span', 'box'] as const
 export type LabelingKind = (typeof LABELING_KINDS)[number]
 
 export const LABELING_MIN_LABELS = 2
@@ -38,6 +39,22 @@ export const labelingSpanSchema = z.object({
 })
 
 export type LabelingSpan = z.infer<typeof labelingSpanSchema>
+
+/**
+ * 框选的一个框。坐标按图片的比例存（左上角 x、y，宽 w、高 h，都在 0–1 之间），和图在屏幕上显示多大无关。
+ */
+export const labelingBoxSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  w: z.number().gt(0).max(1),
+  h: z.number().gt(0).max(1),
+  label: z.string(),
+})
+
+export type LabelingBox = z.infer<typeof labelingBoxSchema>
+
+/** 学生的框和答案的框重合多少算对：交并比 ≥ 这个数（设计文档 3.6 节第 2 条，以后可改） */
+export const LABELING_BOX_IOU = 0.5
 
 // ---------------------------------------------------------------- 判对错（前后端共用）
 
@@ -100,6 +117,73 @@ export function spanFeedback(mistakes: SpanMistake[]) {
   return parts.join('，')
 }
 
+// ---------------------------------------------------------------- 框选判对错（前后端共用）
+
+/** 交并比：两个框重叠的面积 ÷ 两个框合起来的面积 */
+export function boxIou(a: Omit<LabelingBox, 'label'>, b: Omit<LabelingBox, 'label'>) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)
+  const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)
+  if (w <= 0 || h <= 0) return 0
+  const inter = w * h
+  return inter / (a.w * a.h + b.w * b.h - inter)
+}
+
+/** 框选的错：漏框、类别不对、框歪了（碰到了但重合不到一半）、多框 */
+export interface BoxMistake {
+  kind: 'missing' | 'label' | 'range' | 'extra'
+  /** 漏框 / 类别不对 / 框歪了：答案里那个框；多框：学生画的那个框 */
+  box: LabelingBox
+  /** 答案里第几个框（多框时没有） */
+  index?: number
+  /** 类别不对时学生选的类别 */
+  got?: string
+}
+
+/**
+ * 先按重合程度从高到低一对一配对（每个框只配一次），再看每一对：重合够一半比类别，不够一半算框歪了；
+ * 答案里没配上的算漏框，学生画的没配上的算多框。
+ */
+export function boxMistakes(answer: LabelingBox[], given: LabelingBox[]): BoxMistake[] {
+  const pairs: { a: number; g: number; iou: number }[] = []
+  answer.forEach((a, ai) =>
+    given.forEach((g, gi) => {
+      const iou = boxIou(a, g)
+      if (iou > 0) pairs.push({ a: ai, g: gi, iou })
+    }),
+  )
+  pairs.sort((p, q) => q.iou - p.iou)
+  const usedA = new Map<number, { g: number; iou: number }>()
+  const usedG = new Set<number>()
+  for (const p of pairs) {
+    if (usedA.has(p.a) || usedG.has(p.g)) continue
+    usedA.set(p.a, p)
+    usedG.add(p.g)
+  }
+  const mistakes: BoxMistake[] = []
+  answer.forEach((a, index) => {
+    const pair = usedA.get(index)
+    if (!pair) return mistakes.push({ kind: 'missing', box: a, index })
+    if (pair.iou < LABELING_BOX_IOU) return mistakes.push({ kind: 'range', box: a, index })
+    const got = given[pair.g]!.label
+    if (got !== a.label) mistakes.push({ kind: 'label', box: a, index, got })
+  })
+  given.forEach((g, gi) => {
+    if (!usedG.has(gi)) mistakes.push({ kind: 'extra', box: g })
+  })
+  return mistakes
+}
+
+/** 给学生的那句话：只说哪类问题、各几个，不说是哪个框 */
+export function boxFeedback(mistakes: BoxMistake[]) {
+  const count = (kind: BoxMistake['kind']) => mistakes.filter((m) => m.kind === kind).length
+  const parts: string[] = []
+  if (count('missing')) parts.push(`还少框了 ${count('missing')} 个`)
+  if (count('label')) parts.push(`有 ${count('label')} 个框类别不对`)
+  if (count('range')) parts.push(`有 ${count('range')} 个框歪了`)
+  if (count('extra')) parts.push(`多框了 ${count('extra')} 个`)
+  return parts.join('，')
+}
+
 /** 一段在句子里是哪几个字 */
 export function spanText(text: string, span: { start: number; end: number }) {
   return Array.from(text).slice(span.start, span.end).join('')
@@ -130,6 +214,8 @@ export const labelingItemInputSchema = z.object({
   answer: z.string().nullable(),
   /** 实体标注的答案；分类恒为空 */
   spans: z.array(labelingSpanSchema).max(100),
+  /** 框选的答案；别的类型恒为空 */
+  boxes: z.array(labelingBoxSchema).max(100).default([]),
   reason: z.string().max(LABELING_MAX_REASON),
 })
 
@@ -147,6 +233,7 @@ export const adminLabelingItemSchema = z.object({
   hasImage: z.boolean(),
   answer: z.string().nullable(),
   spans: z.array(labelingSpanSchema),
+  boxes: z.array(labelingBoxSchema),
   reason: z.string(),
 })
 
@@ -207,6 +294,8 @@ export const labelingWrongItemSchema = z.object({
   spans: z.array(labelingSpanSchema),
   firstLabel: z.string().nullable(),
   firstSpans: z.array(labelingSpanSchema).nullable(),
+  boxes: z.array(labelingBoxSchema),
+  firstBoxes: z.array(labelingBoxSchema).nullable(),
   reason: z.string(),
 })
 
@@ -232,10 +321,11 @@ export const labelingDetailSchema = z.object({
     .nullable(),
 })
 
-/** 交一条：分类交 label，实体标注交 spans */
+/** 交一条：分类交 label，实体标注交 spans，框选交 boxes */
 export const answerLabelingRequestSchema = z.object({
   label: z.string().max(LABELING_MAX_LABEL_LENGTH).optional(),
   spans: z.array(labelingSpanSchema).max(100).optional(),
+  boxes: z.array(labelingBoxSchema).max(100).optional(),
 })
 
 export const answerLabelingResponseSchema = z.object({
@@ -249,9 +339,10 @@ export const answerLabelingResponseSchema = z.object({
 // ---------------------------------------------------------------- 老师：全班情况
 
 export const labelingProgressCellSchema = z.object({
-  /** 第一次交的是什么；没交过是 null（分类看 firstLabel，实体标注看 firstSpans） */
+  /** 第一次交的是什么；没交过是 null（分类看 firstLabel，实体标注看 firstSpans，框选看 firstBoxes） */
   firstLabel: z.string().nullable(),
   firstSpans: z.array(labelingSpanSchema).nullable(),
+  firstBoxes: z.array(labelingBoxSchema).nullable(),
   wrongCount: z.number().int(),
   passed: z.boolean(),
 })

@@ -3,6 +3,8 @@
  * 判对错只在这里（服务器）做，学生页面上拿不到答案。
  */
 import {
+  boxFeedback,
+  boxMistakes,
   LABELING_MAX_LABELS,
   LABELING_MAX_SPAN_TEXT,
   LABELING_MIN_LABELS,
@@ -10,6 +12,7 @@ import {
   spanFeedback,
   spanMistakes,
   spansEqual,
+  type LabelingBox,
   type LabelingKind,
   type LabelingSpan,
   type SaveLabelingRequest,
@@ -26,6 +29,7 @@ export const itemColumns = {
   imageType: schema.labelingItem.imageType,
   answer: schema.labelingItem.answer,
   spans: schema.labelingItem.spans,
+  boxes: schema.labelingItem.boxes,
   reason: schema.labelingItem.reason,
 }
 
@@ -35,6 +39,7 @@ export interface ItemRow {
   imageType: string | null
   answer: string | null
   spans: LabelingSpan[]
+  boxes: LabelingBox[]
   reason: string
 }
 
@@ -50,19 +55,33 @@ export function spansError(text: string, spans: LabelingSpan[], labels: string[]
   return null
 }
 
+/** 框都在图里面、类别在这一节的类别里（框之间可以重叠：人骑在车上） */
+export function boxesError(boxes: LabelingBox[], labels: string[], where: string) {
+  for (const box of boxes) {
+    // 浮点误差：右下角算出来可能是 1.0000000002
+    if (box.x + box.w > 1.000001 || box.y + box.h > 1.000001) return `${where}有一个框超出了图片，重新画一下`
+    if (!labels.includes(box.label)) return `${where}用了「${box.label}」，可这一节没有这个类别`
+  }
+  return null
+}
+
 /**
  * 整节存之前的检查，返回中文的、指到第几条的说法。`imageIds`：这一节现有的图片条目
  * （图片条目只能改，不能凭空建）。
  */
+function word(kind: LabelingKind) {
+  return kind === 'span' || kind === 'box' ? '类别' : '标签'
+}
+
 export function labelingSaveError(kind: LabelingKind, body: SaveLabelingRequest, imageIds: Set<number>) {
   const labels = body.labels
   if (labels.length < LABELING_MIN_LABELS || labels.length > LABELING_MAX_LABELS) {
-    return `${kind === 'span' ? '类别' : '标签'}要 ${LABELING_MIN_LABELS} 到 ${LABELING_MAX_LABELS} 个`
+    return `${word(kind)}要 ${LABELING_MIN_LABELS} 到 ${LABELING_MAX_LABELS} 个`
   }
-  if (new Set(labels).size !== labels.length) return `${kind === 'span' ? '类别' : '标签'}有重复的`
+  if (new Set(labels).size !== labels.length) return `${word(kind)}有重复的`
   for (const [index, item] of body.items.entries()) {
     const where = `第 ${index + 1} 条`
-    if (kind === 'image') {
+    if (kind === 'image' || kind === 'box') {
       if (item.id === undefined || !imageIds.has(item.id)) return `${where}的图片找不到了，刷新一下`
     } else if (!item.text.trim()) {
       return `${where}是空的`
@@ -70,6 +89,9 @@ export function labelingSaveError(kind: LabelingKind, body: SaveLabelingRequest,
     if (kind === 'span') {
       if (Array.from(item.text).length > LABELING_MAX_SPAN_TEXT) return `${where}太长了，一句最多 ${LABELING_MAX_SPAN_TEXT} 个字`
       const error = spansError(item.text, item.spans, labels, where)
+      if (error) return error
+    } else if (kind === 'box') {
+      const error = boxesError(item.boxes, labels, where)
       if (error) return error
     } else {
       if (item.answer !== null && !labels.includes(item.answer)) return `${where}的标签「${item.answer}」不在这一节的标签里`
@@ -83,15 +105,24 @@ export function labelingSaveError(kind: LabelingKind, body: SaveLabelingRequest,
 /** 第一次交的对不对，对照**当前**答案现算（老师改了答案就跟着变） */
 export function firstCorrect(
   kind: LabelingKind,
-  item: Pick<ItemRow, 'answer' | 'spans'>,
-  first: { firstLabel: string | null; firstSpans: LabelingSpan[] | null },
+  item: Pick<ItemRow, 'answer' | 'spans' | 'boxes'>,
+  first: { firstLabel: string | null; firstSpans: LabelingSpan[] | null; firstBoxes: LabelingBox[] | null },
 ) {
   if (kind === 'span') return first.firstSpans !== null && spansEqual(item.spans, first.firstSpans)
+  if (kind === 'box') return first.firstBoxes !== null && boxMistakes(item.boxes, first.firstBoxes).length === 0
   return first.firstLabel !== null && first.firstLabel === item.answer
 }
 
-/** 判一次：分类比标签，实体标注比每一段 */
-export function judge(kind: LabelingKind, item: Pick<ItemRow, 'answer' | 'spans'>, given: { label?: string; spans?: LabelingSpan[] }) {
+/** 判一次：分类比标签，实体标注比每一段，框选比每个框（重合够一半、类别一样） */
+export function judge(
+  kind: LabelingKind,
+  item: Pick<ItemRow, 'answer' | 'spans' | 'boxes'>,
+  given: { label?: string; spans?: LabelingSpan[]; boxes?: LabelingBox[] },
+) {
+  if (kind === 'box') {
+    const mistakes = boxMistakes(item.boxes, given.boxes ?? [])
+    return { correct: mistakes.length === 0, feedback: mistakes.length ? `不对：${boxFeedback(mistakes)}` : null }
+  }
   if (kind === 'span') {
     const spans = given.spans ?? []
     const mistakes = spanMistakes(item.spans, spans)

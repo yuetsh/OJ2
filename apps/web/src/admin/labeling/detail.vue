@@ -13,6 +13,8 @@ import {
 } from '@oj2/contract'
 import MarkdownEditor from 'shared/components/MarkdownEditor.vue'
 import { errorMessage } from 'utils/api'
+import BoxPicker from 'oj/labeling/components/BoxPicker.vue'
+import BoxView from 'oj/labeling/components/BoxView.vue'
 import LabelingImage from 'oj/labeling/components/LabelingImage.vue'
 import SpanPicker from 'oj/labeling/components/SpanPicker.vue'
 import SpanText from 'oj/labeling/components/SpanText.vue'
@@ -24,7 +26,7 @@ import { parsePaste } from './paste'
 import { shrinkImage } from './shrink'
 
 /**
- * 后台「数据标注」出题页（画布 LabelEditText / LabelEditImage / LabelEditSpan）：左边写，右边是点中那一条
+ * 后台「数据标注」出题页（画布 LabelEditText / LabelEditImage / LabelEditSpan；框选照图片的样子，点中一张在下面画答案框）：左边写，右边是点中那一条
  * 学生看到的样子。规则见 docs/specs/2026-11-17-data-labeling-lab-design.md 第 5 节、3.5 节。
  *
  * - 整节一个「保存」；图片上传是即时的（传一张 = 在最后加一条，标签还没选）。
@@ -56,8 +58,10 @@ let baseline = ''
 const previewCollapsed = usePreviewCollapsed()
 const labelingId = computed(() => Number(props.labelingID))
 const kind = computed<LabelingKind>(() => labeling.value?.kind ?? 'text')
-const labelWord = computed(() => (kind.value === 'span' ? '类别' : '标签'))
-const KIND_TEXT: Record<LabelingKind, string> = { text: '文字分类', image: '图片分类', span: '实体标注' }
+const labelWord = computed(() => (kind.value === 'span' || kind.value === 'box' ? '类别' : '标签'))
+/** 图片分类、框选：条目是传上来的图 */
+const withImage = computed(() => kind.value === 'image' || kind.value === 'box')
+const KIND_TEXT: Record<LabelingKind, string> = { text: '文字分类', image: '图片分类', span: '实体标注', box: '框选' }
 
 // ---------------------------------------------------------------- 读、存
 
@@ -67,7 +71,7 @@ function toForm(data: AdminLabeling) {
   form.description = data.description
   form.isPublic = data.isPublic
   form.labels = [...data.labels]
-  form.items = data.items.map(({ id, text, hasImage, answer, spans, reason }) => ({ id, text, hasImage, answer, spans, reason, key: nextKey++ }))
+  form.items = data.items.map(({ id, text, hasImage, answer, spans, boxes, reason }) => ({ id, text, hasImage, answer, spans, boxes, reason, key: nextKey++ }))
   baseline = snapshot()
 }
 
@@ -77,7 +81,7 @@ function toBody(): SaveLabelingRequest {
     description: form.description,
     isPublic: form.isPublic,
     labels: form.labels,
-    items: form.items.map(({ id, text, answer, spans, reason }) => ({ id, text, answer, spans, reason })),
+    items: form.items.map(({ id, text, answer, spans, boxes, reason }) => ({ id, text, answer, spans, boxes, reason })),
   }
 }
 
@@ -86,7 +90,7 @@ function snapshot() {
 }
 
 const dirty = computed(() => labeling.value !== null && snapshot() !== baseline)
-const unlabeled = computed(() => (kind.value === 'span' ? 0 : form.items.filter((item) => item.answer === null).length))
+const unlabeled = computed(() => (kind.value === 'span' || kind.value === 'box' ? 0 : form.items.filter((item) => item.answer === null).length))
 
 watch(unlabeled, (n) => {
   if (n && form.isPublic) form.isPublic = false
@@ -151,7 +155,7 @@ function addLabel() {
 }
 
 function usesLabel(item: ItemForm, label: string) {
-  return item.answer === label || item.spans.some((s) => s.label === label)
+  return item.answer === label || item.spans.some((s) => s.label === label) || item.boxes.some((b) => b.label === label)
 }
 
 function removeLabel(label: string) {
@@ -168,7 +172,7 @@ const labelOptions = computed(() => form.labels.map((l) => ({ label: l, value: l
 
 function addItem() {
   if (form.items.length >= LABELING_MAX_ITEMS) return message.warning(`一节最多 ${LABELING_MAX_ITEMS} 条`)
-  const item: ItemForm = { key: nextKey++, text: '', hasImage: false, answer: null, spans: [], reason: '' }
+  const item: ItemForm = { key: nextKey++, text: '', hasImage: false, answer: null, spans: [], boxes: [], reason: '' }
   form.items.push(item)
   selectedKey.value = item.key
 }
@@ -223,7 +227,7 @@ function applyPaste() {
   const room = LABELING_MAX_ITEMS - form.items.length
   const taken = items.slice(0, Math.max(0, room))
   if (items.length > taken.length) errors.push(`一节最多 ${LABELING_MAX_ITEMS} 条，后面 ${items.length - taken.length} 条没加`)
-  const added = taken.map((item) => ({ ...item, key: nextKey++, hasImage: false }))
+  const added = taken.map((item) => ({ ...item, boxes: [], key: nextKey++, hasImage: false }))
   form.items.push(...added)
   newKeys.value = new Set(added.map((item) => item.key))
   pasteAdded.value = added.length
@@ -256,7 +260,7 @@ async function uploadImages(event: Event) {
       // 服务器同时把这一节收回成不公开（新图还没选标签），基线也跟着改
       const base = JSON.parse(baseline) as SaveLabelingRequest
       base.isPublic = false
-      base.items.push({ id: item.id, text: item.text, answer: item.answer, spans: item.spans, reason: item.reason })
+      base.items.push({ id: item.id, text: item.text, answer: item.answer, spans: item.spans, boxes: item.boxes, reason: item.reason })
       baseline = JSON.stringify(base)
     } catch (err) {
       message.error(`${file.name}：${errorMessage(err, '没传上')}`)
@@ -290,7 +294,7 @@ onMounted(() => {
             <span>学生可见</span>
           </label>
         </div>
-        <n-text v-if="unlabeled" class="warn small right">还有 {{ unlabeled }} {{ kind === 'image' ? '张' : '条' }}没选标签</n-text>
+        <n-text v-if="unlabeled" class="warn small right">还有 {{ unlabeled }} {{ withImage ? '张' : '条' }}没选标签</n-text>
         <MarkdownEditor v-model:value="form.description" height="110px" />
         <div class="row">
           <span class="label">类型</span>
@@ -312,7 +316,7 @@ onMounted(() => {
         </div>
       </section>
 
-      <section v-if="kind !== 'image'" class="card">
+      <section v-if="!withImage" class="card">
         <div class="row">
           <h3>批量粘贴</h3>
           <n-text depth="3" class="small">{{
@@ -329,11 +333,11 @@ onMounted(() => {
 
       <section class="card list">
         <div class="row pad">
-          <h3>{{ kind === 'image' ? '图片' : kind === 'span' ? '句子' : '数据' }}</h3>
-          <n-text depth="3" class="small">{{ form.items.length }} {{ kind === 'image' ? '张' : kind === 'span' ? '句' : '条' }}</n-text>
+          <h3>{{ withImage ? '图片' : kind === 'span' ? '句子' : '数据' }}</h3>
+          <n-text depth="3" class="small">{{ form.items.length }} {{ withImage ? '张' : kind === 'span' ? '句' : '条' }}</n-text>
           <n-text v-if="form.items.length > LABELING_SUGGESTED_ITEMS" class="warn small">超过 {{ LABELING_SUGGESTED_ITEMS }} 条，一节课可能做不完</n-text>
           <span class="grow"></span>
-          <template v-if="kind === 'image'">
+          <template v-if="withImage">
             <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="uploadImages" />
             <n-button size="small" :loading="!!uploading" @click="fileInput?.click()">
               {{ uploading ? `传了 ${uploading.done} / ${uploading.total}` : '+ 选图片（可以多选）' }}
@@ -342,8 +346,8 @@ onMounted(() => {
           <n-button v-else size="small" @click="addItem">+ 加{{ kind === 'span' ? '一句' : '一条' }}</n-button>
         </div>
 
-        <!-- 图片：四列缩略图 -->
-        <div v-if="kind === 'image'" class="imageGrid">
+        <!-- 图片、框选：四列缩略图 -->
+        <div v-if="withImage" class="imageGrid">
           <div
             v-for="(item, i) in form.items"
             :key="item.key"
@@ -353,10 +357,15 @@ onMounted(() => {
           >
             <button type="button" class="thumb" :aria-label="`第 ${i + 1} 张`" @click="select(item)">
               <span class="no">{{ i + 1 }}</span>
-              <LabelingImage v-if="item.id" :labeling-id="labelingId" :item-id="item.id" />
+              <BoxView v-if="item.id && kind === 'box'" :labeling-id="labelingId" :item-id="item.id" :boxes="item.boxes" :labels="form.labels" :chips="false" />
+              <LabelingImage v-else-if="item.id" :labeling-id="labelingId" :item-id="item.id" />
             </button>
             <div class="cardFoot">
+              <button v-if="kind === 'box'" type="button" class="boxCount" @click="select(item)">
+                {{ item.boxes.length ? `${item.boxes.length} 个框` : '还没画框' }}
+              </button>
               <n-select
+                v-else
                 v-model:value="item.answer"
                 size="small"
                 :options="labelOptions"
@@ -411,15 +420,23 @@ onMounted(() => {
           </template>
         </template>
 
-        <!-- 图片的理由：点中那张在下面改 -->
-        <div v-if="kind === 'image' && selected" class="editBox">
+        <!-- 图片的理由（框选还有答案框）：点中那张在下面改 -->
+        <div v-if="withImage && selected" class="editBox">
+          <BoxPicker
+            v-if="kind === 'box' && selected.id"
+            v-model="selected.boxes"
+            :labeling-id="labelingId"
+            :item-id="selected.id"
+            :labels="form.labels"
+            compact
+          />
           <div class="row">
             <span class="label">第 {{ selectedIndex + 1 }} 张的理由</span>
             <n-input v-model:value="selected.reason" size="small" placeholder="标对后给学生看的一句话（可以不写）" />
           </div>
         </div>
 
-        <n-empty v-if="!form.items.length" :description="kind === 'image' ? '还没有图片' : '还没有数据'" class="empty" />
+        <n-empty v-if="!form.items.length" :description="withImage ? '还没有图片' : '还没有数据'" class="empty" />
       </section>
 
       <div class="saveBar">
@@ -444,6 +461,7 @@ onMounted(() => {
         <template v-if="kind === 'span'">
           <div class="phoneText"><SpanText :text="selected.text" :spans="selected.spans" :labels="form.labels" /></div>
         </template>
+        <BoxView v-else-if="kind === 'box' && selected.id" :labeling-id="labelingId" :item-id="selected.id" :boxes="selected.boxes" :labels="form.labels" />
         <template v-else>
           <div v-if="selected.hasImage && selected.id" class="phoneImage"><LabelingImage :labeling-id="labelingId" :item-id="selected.id" /></div>
           <div v-else class="phoneText">{{ selected.text }}</div>
@@ -469,6 +487,18 @@ onMounted(() => {
 <style scoped>
 .small {
   font-size: 12px;
+}
+
+.boxCount {
+  flex: 1 1 auto;
+  height: 28px;
+  border: 1px dashed v-bind('theme.borderColor');
+  border-radius: 3px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
 }
 
 .right {

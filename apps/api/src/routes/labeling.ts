@@ -22,7 +22,7 @@ import { optionalAuth, requireAuth, requireTeacher, type AppEnv } from '../auth/
 import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
 import { suggestActiveClass } from '../services/class-activity'
-import { firstCorrect, itemColumns, judge, spansError, type ItemRow } from '../services/labeling'
+import { boxesError, firstCorrect, itemColumns, judge, spansError, type ItemRow } from '../services/labeling'
 import { adminItem } from './admin/labeling'
 import { queryInteger } from './helpers'
 
@@ -131,6 +131,8 @@ labelingRoutes.get('/labelings/:id', optionalAuth, async (c) => {
                 spans: item.spans,
                 firstLabel: a.firstLabel,
                 firstSpans: a.firstSpans,
+                boxes: item.boxes,
+                firstBoxes: a.firstBoxes,
                 reason: item.reason,
               }
             }),
@@ -165,6 +167,9 @@ labelingRoutes.post('/labelings/:id/items/:itemId/answer', requireAuth, async (c
   if (labeling.kind === 'span') {
     const error = spansError(item.text, given.spans ?? [], labeling.labels, '')
     if (error) return failure(c, 400, 'invalid-answer', error)
+  } else if (labeling.kind === 'box') {
+    const error = boxesError(given.boxes ?? [], labeling.labels, '')
+    if (error) return failure(c, 400, 'invalid-answer', error)
   } else {
     if (given.label === undefined || !labeling.labels.includes(given.label)) return failure(c, 400, 'invalid-answer', '没有这个标签')
     if (item.answer === null) return failure(c, 400, 'no-answer', '这一条老师还没定标签')
@@ -186,8 +191,9 @@ labelingRoutes.post('/labelings/:id/items/:itemId/answer', requireAuth, async (c
       userId,
       itemId: item.id,
       labelingId: labeling.id,
-      firstLabel: labeling.kind === 'span' ? null : given.label!,
+      firstLabel: labeling.kind === 'text' || labeling.kind === 'image' ? given.label! : null,
       firstSpans: labeling.kind === 'span' ? (given.spans ?? []) : null,
+      firstBoxes: labeling.kind === 'box' ? (given.boxes ?? []) : null,
       wrongCount: correct ? 0 : 1,
       passedAt: correct ? now : null,
       createdAt: now,
@@ -291,6 +297,7 @@ labelingRoutes.get('/labelings/:id/progress', requireTeacher, async (c) => {
         return {
           firstLabel: a?.firstLabel ?? null,
           firstSpans: a?.firstSpans ?? null,
+          firstBoxes: a?.firstBoxes ?? null,
           wrongCount: a?.wrongCount ?? 0,
           passed: !!a?.passedAt,
         }

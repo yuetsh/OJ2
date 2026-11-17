@@ -8,7 +8,7 @@ const theme = useThemeVars()
 const labelings = ref<LabelingListItem[]>([])
 const loading = ref(true)
 
-const KIND_TEXT: Record<LabelingKind, string> = { text: '文字', image: '图片', span: '实体标注' }
+const KIND_TEXT: Record<LabelingKind, string> = { text: '文字', image: '图片', span: '实体标注', box: '框选' }
 
 onMounted(async () => {
   try {

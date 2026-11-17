@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
-import type { AnswerLabelingResponse, LabelingDetail, LabelingSpan } from '@oj2/contract'
+import type { AnswerLabelingResponse, LabelingBox, LabelingDetail, LabelingSpan } from '@oj2/contract'
 import Markdown from 'shared/components/Markdown.vue'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useUserStore } from 'shared/store/user'
 import { errorMessage } from 'utils/api'
 import { answerLabeling, getLabeling, resetLabeling } from 'oj/api'
+import BoxPicker from './components/BoxPicker.vue'
+import BoxView from './components/BoxView.vue'
 import LabelingImage from './components/LabelingImage.vue'
 import SpanPicker from './components/SpanPicker.vue'
 import SpanText from './components/SpanText.vue'
@@ -14,7 +16,7 @@ import { labelColor, titlePieces } from './utils/colors'
 
 /**
  * 学生做一节「数据标注」（画布 LabelStudent / LabelSpanStudent），手机为先：
- * 一次一条，只能往前；分类点一下标签就判，实体标注标完点「提交」才判。
+ * 一次一条，只能往前；分类点一下标签就判，实体标注、框选标完点「提交」才判。框选只按电脑做（设计稿 LabelBoxDesk）。
  * 错了只说「不对」（实体标注说哪类问题），可以再改；对了显示理由，点「下一条」。
  * 做完了显示一次就对几条和错题，不重做（老师有「重来」）。规则见设计文档第 4、8 节和 3.5 节。
  */
@@ -37,13 +39,15 @@ const verdict = ref<AnswerLabelingResponse | null>(null)
 /** 分类：点过的标签（错的那个标橙，对的标绿） */
 const picked = ref<string | null>(null)
 const spans = ref<LabelingSpan[]>([])
+const boxes = ref<LabelingBox[]>([])
 const sending = ref(false)
 
 const current = computed(() => detail.value?.current ?? null)
-/** 实体标注：标题里的类别名铺颜色；标题没写全类别，就在标题下补一行带色块的类别（设计稿 LabelSpanDesk） */
+/** 实体标注、框选：标题里的类别名铺颜色；标题没写全类别，就在标题下补一行带色块的类别（设计稿 LabelSpanDesk） */
+const marking = computed(() => detail.value?.kind === 'span' || detail.value?.kind === 'box')
 const title = computed(() => {
   const d = detail.value
-  if (!d || d.kind !== 'span') return { pieces: [{ text: d?.title ?? '', label: null }], missing: false }
+  if (!d || !marking.value) return { pieces: [{ text: d?.title ?? '', label: null }], missing: false }
   return titlePieces(d.title, d.labels)
 })
 const result = computed(() => detail.value?.result ?? null)
@@ -55,6 +59,7 @@ async function load() {
     verdict.value = null
     picked.value = null
     spans.value = []
+    boxes.value = []
   } catch {
     notFound.value = true
   }
@@ -66,7 +71,7 @@ function needLogin() {
   return true
 }
 
-async function send(body: { label?: string; spans?: LabelingSpan[] }) {
+async function send(body: { label?: string; spans?: LabelingSpan[]; boxes?: LabelingBox[] }) {
   if (!current.value || sending.value || correct.value || needLogin()) return
   sending.value = true
   try {
@@ -83,12 +88,12 @@ function pick(label: string) {
   send({ label })
 }
 
-function submitSpans() {
-  send({ spans: spans.value })
+function submitMarks() {
+  send(detail.value?.kind === 'box' ? { boxes: boxes.value } : { spans: spans.value })
 }
 
 // 改了标注，上一次的「不对」就不算数了
-watch(spans, () => {
+watch([spans, boxes], () => {
   if (verdict.value && !verdict.value.correct) verdict.value = null
 })
 
@@ -124,7 +129,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="oj-page labelingPage">
+  <div class="oj-page labelingPage" :class="{ wide: detail?.kind === 'box' }">
     <n-empty v-if="notFound" description="这一节不存在" />
     <n-spin v-else-if="!detail" size="small" />
     <template v-else>
@@ -143,7 +148,7 @@ onMounted(load)
         <n-tag v-if="!detail.isPublic" size="small" :bordered="false" type="warning">没公开</n-tag>
       </h1>
 
-      <div v-if="detail.kind === 'span' && title.missing" class="legend">
+      <div v-if="marking && title.missing" class="legend">
         <span v-for="label in detail.labels" :key="label" class="legendItem"
           ><span class="swatch" :style="{ background: labelColor(detail.labels, label, isDark).swatch }"></span>{{ label }}</span
         >
@@ -169,9 +174,19 @@ onMounted(load)
           >
         </section>
         <section v-if="result.wrong.length" class="card wrongList">
-          <b class="wrongHead">第一次{{ detail.kind === 'span' ? '没全对' : '标错' }}的 {{ result.wrong.length }} 条</b>
+          <b class="wrongHead">第一次{{ marking ? '没全对' : '标错' }}的 {{ result.wrong.length }} 条</b>
           <div v-for="w in result.wrong" :key="w.id" class="wrong">
-            <template v-if="detail.kind === 'span'">
+            <div v-if="detail.kind === 'box'" class="pair">
+              <div class="pairCol">
+                <div class="lab">应该是</div>
+                <BoxView :labeling-id="detail.id" :item-id="w.id" :boxes="w.boxes" :labels="detail.labels" :chips="false" />
+              </div>
+              <div class="pairCol">
+                <div class="lab">你第一次框的</div>
+                <BoxView :labeling-id="detail.id" :item-id="w.id" :boxes="w.firstBoxes ?? []" :labels="detail.labels" :chips="false" />
+              </div>
+            </div>
+            <template v-else-if="detail.kind === 'span'">
               <div class="lab">应该是</div>
               <SpanText :text="w.text" :spans="w.spans" :labels="detail.labels" class="line" />
               <div class="lab">你第一次标的</div>
@@ -202,6 +217,14 @@ onMounted(load)
         <template v-if="detail.kind === 'span'">
           <SpanPicker v-model="spans" :text="current.text" :labels="detail.labels" :disabled="correct" />
         </template>
+        <BoxPicker
+          v-else-if="detail.kind === 'box'"
+          v-model="boxes"
+          :labeling-id="detail.id"
+          :item-id="current.id"
+          :labels="detail.labels"
+          :disabled="correct"
+        />
         <template v-else>
           <div v-if="current.hasImage" class="card imageBox"><LabelingImage :labeling-id="detail.id" :item-id="current.id" /></div>
           <div v-else class="card dataText">{{ current.text }}</div>
@@ -216,7 +239,7 @@ onMounted(load)
         <div v-if="correct && verdict?.reason" class="say ok">{{ verdict.reason }}</div>
 
         <n-button v-if="correct" type="primary" size="large" block class="mainBtn" @click="load">下一条</n-button>
-        <n-button v-else-if="detail.kind === 'span'" type="primary" size="large" block class="mainBtn" :loading="sending" @click="submitSpans">提交</n-button>
+        <n-button v-else-if="marking" type="primary" size="large" block class="mainBtn" :loading="sending" @click="submitMarks">提交</n-button>
       </template>
     </template>
   </div>
@@ -228,6 +251,24 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* 框选：图要看得清、框要拖得准 */
+.labelingPage.wide {
+  max-width: 960px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.pairCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .back {

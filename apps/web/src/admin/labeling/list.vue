@@ -23,7 +23,7 @@ const newTitle = ref('')
 const creating = ref(false)
 const newKind = ref<LabelingKind>('text')
 
-const KIND_TEXT: Record<LabelingKind, string> = { text: '文字分类', image: '图片分类', span: '实体标注' }
+const KIND_TEXT: Record<LabelingKind, string> = { text: '文字分类', image: '图片分类', span: '实体标注', box: '框选' }
 const KIND_OPTIONS = (Object.keys(KIND_TEXT) as LabelingKind[]).map((value) => ({ value, label: KIND_TEXT[value] }))
 const dragId = ref<number | null>(null)
 

@@ -1,4 +1,13 @@
-import { spanMistakes, spanText, spansEqual, type AdminLabelingItem, type LabelingKind, type LabelingProgress, type LabelingProgressCell } from '@oj2/contract'
+import {
+  boxMistakes,
+  spanMistakes,
+  spanText,
+  spansEqual,
+  type AdminLabelingItem,
+  type LabelingKind,
+  type LabelingProgress,
+  type LabelingProgressCell,
+} from '@oj2/contract'
 
 /**
  * 「全班情况」的两种看法都在这里算（设计文档第 6 节、3.5 节第 4 条）。「第一次对不对」「最常标成什么」
@@ -8,11 +17,12 @@ import { spanMistakes, spanText, spansEqual, type AdminLabelingItem, type Labeli
 type Student = LabelingProgress['students'][number]
 
 export function answered(cell: LabelingProgressCell) {
-  return cell.firstLabel !== null || cell.firstSpans !== null
+  return cell.firstLabel !== null || cell.firstSpans !== null || cell.firstBoxes !== null
 }
 
 export function cellFirstCorrect(kind: LabelingKind, item: AdminLabelingItem, cell: LabelingProgressCell) {
   if (kind === 'span') return cell.firstSpans !== null && spansEqual(item.spans, cell.firstSpans)
+  if (kind === 'box') return cell.firstBoxes !== null && boxMistakes(item.boxes, cell.firstBoxes).length === 0
   return cell.firstLabel !== null && cell.firstLabel === item.answer
 }
 
@@ -62,13 +72,22 @@ export interface ItemRow {
   index: number
   answered: number
   firstCorrect: number
-  /** 最常见的那处错：分类是「标错的多半选了 X」，实体标注是「漏标『碎叶城』」这类 */
+  /** 最常见的那处错：分类是「标错的多半选了 X」，实体标注是「漏标『碎叶城』」，框选是「漏框一个『人』」这类 */
   topMistake: { text: string; count: number } | null
   /** 最常见的错比第一次就对的人还多 → 可能答案定错了，整行标橙 */
   flagged: boolean
 }
 
 function mistakeKeys(kind: LabelingKind, item: AdminLabelingItem, cell: LabelingProgressCell): string[] {
+  if (kind === 'box') {
+    // 框没有名字，只能说是哪一类；同一类有好几个框时，答案里第几个框记在键里但不显示（分开数）
+    return boxMistakes(item.boxes, cell.firstBoxes ?? []).map((m) => {
+      if (m.kind === 'missing') return `漏框一个「${m.box.label}」\u200b${m.index}`
+      if (m.kind === 'label') return `「${m.box.label}」框成了「${m.got}」\u200b${m.index}`
+      if (m.kind === 'range') return `一个「${m.box.label}」框歪了\u200b${m.index}`
+      return `多框了一个「${m.box.label}」`
+    })
+  }
   if (kind !== 'span') return cell.firstLabel !== null && cell.firstLabel !== item.answer ? [cell.firstLabel] : []
   return spanMistakes(item.spans, cell.firstSpans ?? []).map((m) => {
     const words = spanText(item.text, m.span)
@@ -93,7 +112,8 @@ export function itemsView(p: LabelingProgress): ItemRow[] {
       index,
       answered: cells.length,
       firstCorrect,
-      topMistake: top ? { text: top[0], count: top[1] } : null,
+      // 框选的键末尾带着「答案里第几个框」，显示时去掉
+      topMistake: top ? { text: top[0].split('\u200b')[0]!, count: top[1] } : null,
       flagged: !!top && top[1] > firstCorrect,
     }
   })

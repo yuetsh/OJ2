@@ -20,6 +20,13 @@ const DARK = [
   { bg: '#1c4649', fg: '#d6f1f3', tag: '#86d4da', swatch: '#4bb3ba' },
 ]
 
+/** 框选：框和框上的小标签用的深一点的颜色。画在照片上，明暗主题都用这一套；白字在上面看得清 */
+const STROKE = ['#2f6fd6', '#a85800', '#7b4fd1', '#17793f', '#c2364f', '#0f6f76']
+
+export function labelStroke(labels: string[], label: string) {
+  return STROKE[Math.max(0, labels.indexOf(label)) % STROKE.length]!
+}
+
 export function labelColor(labels: string[], label: string, dark: boolean) {
   const index = Math.max(0, labels.indexOf(label))
   return (dark ? DARK : LIGHT)[index % LIGHT.length]!

@@ -7,6 +7,7 @@ import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
 import { groupClassOptions } from 'utils/classes'
 import { getLabeling, getLabelingProgress } from 'oj/api'
+import BoxView from './components/BoxView.vue'
 import LabelingImage from './components/LabelingImage.vue'
 import SpanText from './components/SpanText.vue'
 import { itemsView, peopleView } from './utils/progress'
@@ -34,6 +35,8 @@ const people = computed(() => (progress.value ? peopleView(progress.value) : nul
 const itemRows = computed(() => (progress.value ? itemsView(progress.value) : []))
 const total = computed(() => progress.value?.students.length ?? 0)
 const itemCount = computed(() => progress.value?.items.length ?? 0)
+/** 实体标注、框选：一条里要标好几处，看「全对」和「最常见的错」 */
+const marking = computed(() => progress.value?.kind === 'span' || progress.value?.kind === 'box')
 const shownDone = computed(() => (showAllDone.value ? people.value!.done : people.value!.done.slice(0, 8)))
 
 const classOptions = computed(() => {
@@ -183,17 +186,26 @@ onMounted(async () => {
     <section v-else-if="progress && view === 'items'" class="card items">
       <div class="ir head" :class="progress.kind">
         <span>第几条</span>
-        <span>{{ progress.kind === 'image' ? '图片' : progress.kind === 'span' ? '答案' : '文字' }}</span>
-        <span v-if="progress.kind !== 'span'">答案</span>
-        <span>第一次就{{ progress.kind === 'span' ? '全对' : '标对' }}</span>
-        <span>{{ progress.kind === 'span' ? '最常见的错' : '标错的多半选了' }}</span>
+        <span>{{ progress.kind === 'image' ? '图片' : progress.kind === 'text' ? '文字' : '答案' }}</span>
+        <span v-if="!marking">答案</span>
+        <span>第一次就{{ marking ? '全对' : '标对' }}</span>
+        <span>{{ marking ? '最常见的错' : '标错的多半选了' }}</span>
       </div>
       <div v-for="row in itemRows" :key="row.item.id" class="ir" :class="[progress.kind, { flagged: row.flagged }]">
         <span class="sec num">{{ row.index + 1 }}</span>
         <span v-if="progress.kind === 'image'" class="thumb"><LabelingImage :labeling-id="labelingId" :item-id="row.item.id" /></span>
+        <BoxView
+          v-else-if="progress.kind === 'box'"
+          :labeling-id="labelingId"
+          :item-id="row.item.id"
+          :boxes="row.item.boxes"
+          :labels="progress.labels"
+          :chips="false"
+          class="boxThumb"
+        />
         <SpanText v-else-if="progress.kind === 'span'" :text="row.item.text" :spans="row.item.spans" :labels="progress.labels" class="rowText" />
         <span v-else class="rowText ell2">{{ row.item.text }}</span>
-        <span v-if="progress.kind !== 'span'"
+        <span v-if="!marking"
           ><n-tag size="small" :bordered="false" type="success">{{ row.item.answer ?? '没定' }}</n-tag></span
         >
         <span class="cellBar">
@@ -460,8 +472,13 @@ onMounted(async () => {
   border-bottom: 1px solid v-bind('theme.dividerColor');
 }
 
-.ir.span {
+.ir.span,
+.ir.box {
   grid-template-columns: 52px minmax(0, 1fr) 240px 280px;
+}
+
+.boxThumb {
+  width: 240px;
 }
 
 .ir.head {

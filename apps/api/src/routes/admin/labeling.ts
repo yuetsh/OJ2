@@ -28,7 +28,7 @@ import { queryInteger, sampleUser } from '../helpers'
 export const adminLabelingRoutes = new Hono<AppEnv>()
 
 export function adminItem(row: ItemRow): AdminLabelingItem {
-  return { id: row.id, text: row.text, hasImage: row.imageType !== null, answer: row.answer, spans: row.spans, reason: row.reason }
+  return { id: row.id, text: row.text, hasImage: row.imageType !== null, answer: row.answer, spans: row.spans, boxes: row.boxes, reason: row.reason }
 }
 
 function selectItems(labelingId: number) {
@@ -177,10 +177,11 @@ adminLabelingRoutes.put('/labelings/:id', requireTeacher, async (c) => {
     if (removed.length) await tx.delete(schema.labelingItem).where(inArray(schema.labelingItem.id, removed))
     for (const [order, { id: itemId, ...item }] of body.items.entries()) {
       const values = {
-        // 图片条目没有文字；分类没有段、实体标注没有单个标签
-        text: kind === 'image' ? '' : item.text.trim(),
-        answer: kind === 'span' ? null : item.answer,
+        // 图片、框选的条目没有文字；只有分类有单个标签，只有实体标注有段，只有框选有框
+        text: kind === 'image' || kind === 'box' ? '' : item.text.trim(),
+        answer: kind === 'span' || kind === 'box' ? null : item.answer,
         spans: kind === 'span' ? item.spans : [],
+        boxes: kind === 'box' ? item.boxes : [],
         reason: item.reason.trim(),
         order,
       }
@@ -221,7 +222,7 @@ adminLabelingRoutes.post('/labelings/:id/images', requireTeacher, async (c) => {
   if (!extension) return failure(c, 400, 'invalid-image', '只认 PNG、JPG、GIF、BMP 图片')
   const [labeling] = await db.select({ kind: schema.labeling.kind }).from(schema.labeling).where(eq(schema.labeling.id, labelingId)).limit(1)
   if (!labeling) return failure(c, 404, 'labeling-not-found', '这一节不存在')
-  if (labeling.kind !== 'image') return failure(c, 400, 'not-image-labeling', '这一节不是图片分类')
+  if (labeling.kind !== 'image' && labeling.kind !== 'box') return failure(c, 400, 'not-image-labeling', '这一节不用传图片')
   const [count] = await db
     .select({ n: sql<number>`count(*)`.mapWith(Number) })
     .from(schema.labelingItem)
@@ -238,7 +239,7 @@ adminLabelingRoutes.post('/labelings/:id/images', requireTeacher, async (c) => {
         imageType: IMAGE_TYPES[extension]!,
       })
       .returning(itemColumns)
-    // 新图还没选标签：已经公开的一节先收回来，不然学生会碰上一条怎么点都不对的（出题页同时把开关关掉）
+    // 新图还没选标签 / 还没画框：已经公开的一节先收回来，不然学生会碰上一条怎么点都不对的（出题页同时把开关关掉）
     await tx.update(schema.labeling).set({ isPublic: false }).where(eq(schema.labeling.id, labelingId))
     return inserted!
   })
