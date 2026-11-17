@@ -74,6 +74,18 @@ def _label_diff(name, ref_ix, stu_ix, what):
     return f'{name} 的顺序不对，应该是 {shown}'
 
 
+
+def _where(index, i, unit):
+    """第 i 项（行）怎么说：有自己的索引就说索引名，否则说第几项。
+
+    索引的名字只留了前 MAX_FP_ITEMS 个（kernel.py 的 _index），数值却能取到更多：超过 5000 行、
+    索引又不是 0、1、2… 的长表，后面那些行没有名字可说，原来直接 IndexError、运行器回 500。
+    """
+    labels = index['labels']
+    if not index['range'] and i < len(labels):
+        return f'「{labels[i]}」这一{unit}'
+    return f'第 {i + 1} {unit}'
+
 def compare_value(name, ref, stu):
     """返回说法列表；空列表就是一样。"""
     if stu['t'] == 'missing':
@@ -130,10 +142,9 @@ def compare_value(name, ref, stu):
         if 'values' not in ref or 'values' not in stu:
             return []
         msgs = []
-        labeled = not ref['index']['range']
         for i, (r, s) in enumerate(zip(ref['values'], stu['values'])):
             if not same(s, r):
-                where = f'「{ref["index"]["labels"][i]}」这一项' if labeled else f'第 {i + 1} 项'
+                where = _where(ref['index'], i, '项')
                 msgs.append(f'{name} 里{where}：你的是 {fmt(s)}，应该是 {fmt(r)}')
                 if len(msgs) >= MAX_MESSAGES:
                     break
@@ -157,11 +168,10 @@ def compare_value(name, ref, stu):
         if 'values' not in ref or 'values' not in stu:
             return []
         msgs = []
-        labeled = not ref['index']['range']
         for i, (rrow, srow) in enumerate(zip(ref['values'], stu['values'])):
             for j, (r, s) in enumerate(zip(rrow, srow)):
                 if not same(s, r):
-                    row = f'「{ref["index"]["labels"][i]}」这一行' if labeled else f'第 {i + 1} 行'
+                    row = _where(ref['index'], i, '行')
                     msgs.append(f'{name} {row}「{rc[j]}」：你的是 {fmt(s)}，应该是 {fmt(r)}')
                     if len(msgs) >= MAX_MESSAGES:
                         return msgs

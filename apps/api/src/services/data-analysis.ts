@@ -14,6 +14,15 @@ import { db, schema } from '../db'
 export class DataAnalysisRunnerError extends Error {}
 /** 同一个人上一次还没跑完 */
 export class DataAnalysisBusyError extends Error {}
+/** 第 1…k 步的代码加起来超过运行器收的上限 */
+export class DataAnalysisTooLongError extends Error {}
+
+/**
+ * 运行器一次最多收这么多字的代码（docker/data-analysis/runner.py 的 MAX_CODE，按 Python 的 len 数，
+ * 和 JS 的 length 只在 emoji 这类字上有出入，这里按 length 数只会更严）。契约是一步 2 万字、最多 30 步，
+ * 乘起来比它大；超了运行器回 400，原来被当成「运行器暂时连不上」，学生以为是服务器坏了。
+ */
+const RUNNER_MAX_CODE = 200 * 1024
 
 /** 运行器自己的墙钟是 20 秒；并发满了要排队，这里给足余量 */
 const RUN_TIMEOUT_MS = 90_000
@@ -98,6 +107,8 @@ export async function runDataAnalysis(userId: number, request: DataAnalysisRunne
 }
 
 async function callRunner(request: DataAnalysisRunnerRequest): Promise<RunnerResponse> {
+  const total = (codes?: string[]) => (codes ?? []).reduce((sum, code) => sum + code.length, 0)
+  if (total(request.steps) > RUNNER_MAX_CODE || total(request.reference) > RUNNER_MAX_CODE) throw new DataAnalysisTooLongError()
   let res: Response
   try {
     res = await fetch('http://data-analysis/run', {
@@ -137,15 +148,27 @@ export async function dataAnalysisAssetsPayload(dataAnalysisId: number) {
     .select({ id: schema.dataAnalysisAsset.id, name: schema.dataAnalysisAsset.name })
     .from(schema.dataAnalysisAsset)
     .where(eq(schema.dataAnalysisAsset.dataAnalysisId, dataAnalysisId))
-  const missing = rows.filter((row) => !assetCache.has(row.id)).map((row) => row.id)
+  // 先把命中的取出来拿在手里，再去库里补没命中的：补的时候会淘汰旧的，刚才判为命中的可能正好被挤掉，
+  // 回头再查缓存就成了空文件发给运行器（学生看到读表报错）。
+  const found = new Map<number, string>()
+  for (const row of rows) {
+    const hit = assetCache.get(row.id)
+    if (hit !== undefined) found.set(row.id, hit)
+  }
+  const missing = rows.filter((row) => !found.has(row.id)).map((row) => row.id)
   if (missing.length) {
     const data = await db
       .select({ id: schema.dataAnalysisAsset.id, data: schema.dataAnalysisAsset.data })
       .from(schema.dataAnalysisAsset)
       .where(inArray(schema.dataAnalysisAsset.id, missing))
-    for (const row of data) rememberAsset(row.id, Buffer.from(row.data).toString('base64'))
+    for (const row of data) {
+      const base64 = Buffer.from(row.data).toString('base64')
+      found.set(row.id, base64)
+      rememberAsset(row.id, base64)
+    }
   }
-  return rows.map((row) => ({ id: row.id, name: row.name, data: assetCache.get(row.id) ?? '' }))
+  // 两次查询之间老师删掉的素材就不带了
+  return rows.filter((row) => found.has(row.id)).map((row) => ({ id: row.id, name: row.name, data: found.get(row.id)! }))
 }
 
 /** 素材文件名：直接当文件名写进运行目录，学生代码里也按它读 */
@@ -170,28 +193,49 @@ function pyString(value: string) {
 }
 
 const previewCache = new Map<number, DataAnalysisAssetPreview>()
+/** 课上全班同时打开同一节：同一个素材只让运行器读一次，其余的等它 */
+const previewPending = new Map<number, Promise<DataAnalysisAssetPreview>>()
 
-/** 表格类素材（xlsx / csv）的内容，拿运行器读一遍。按素材 id 缓存（素材只增不改）。 */
+/**
+ * 表格类素材（xlsx / csv）的内容，拿运行器读一遍。按素材 id 缓存（素材只增不改）。
+ * 只缓存「读出来了」和「文件本身读不了」（老师传错了格式之类，重读也一样）；超时、运行器崩了这类
+ * 一时的失败不缓存 —— 不然课上负载高时碰上一次，api 重启前全班都看不到这张表。
+ */
 export async function dataAnalysisAssetPreview(dataAnalysisId: number, asset: { id: number; name: string }): Promise<DataAnalysisAssetPreview> {
   const cached = previewCache.get(asset.id)
   if (cached) return cached
   const ext = asset.name.split('.').pop()?.toLowerCase() ?? ''
   const reader = PREVIEW_READERS[ext]
   if (!reader) return { table: null, error: null }
-  const result = await callRunner({
-    assets: (await dataAnalysisAssetsPayload(dataAnalysisId)).filter((a) => a.name === asset.name),
-    steps: [`import pandas as pd\n${reader(asset.name)}\ndf`],
-    check: { kind: 'none' },
-  })
-  const table = result.outputs.find((o) => o.kind === 'table') ?? null
-  const preview: DataAnalysisAssetPreview = {
-    table: table && table.kind === 'table' ? table : null,
-    error: result.error ? `读不出来：${result.error.type} ${result.error.message}` : null,
+  const pending = previewPending.get(asset.id)
+  if (pending) return pending
+  const job = (async () => {
+    const result = await callRunner({
+      assets: (await dataAnalysisAssetsPayload(dataAnalysisId)).filter((a) => a.name === asset.name),
+      steps: [`import pandas as pd\n${reader(asset.name)}\ndf`],
+      check: { kind: 'none' },
+    })
+    const table = result.outputs.find((o) => o.kind === 'table') ?? null
+    const preview: DataAnalysisAssetPreview = {
+      table: table && table.kind === 'table' ? table : null,
+      error: result.error ? `读不出来：${result.error.type} ${result.error.message}` : null,
+    }
+    if (!TRANSIENT_ERRORS.has(result.error?.type ?? '')) {
+      if (previewCache.size > 500) previewCache.clear()
+      previewCache.set(asset.id, preview)
+    }
+    return preview
+  })()
+  previewPending.set(asset.id, job)
+  try {
+    return await job
+  } finally {
+    previewPending.delete(asset.id)
   }
-  if (previewCache.size > 500) previewCache.clear()
-  previewCache.set(asset.id, preview)
-  return preview
 }
+
+/** 运行器回的这两种错误是一时的（排队太久、内存一时不够），和素材本身无关 */
+const TRANSIENT_ERRORS = new Set(['Timeout', 'Crashed'])
 
 // ---------------------------------------------------------------- 步骤
 

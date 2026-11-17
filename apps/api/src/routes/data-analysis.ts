@@ -29,6 +29,7 @@ import { suggestActiveClass } from '../services/class-activity'
 import {
   DataAnalysisBusyError,
   DataAnalysisRunnerError,
+  DataAnalysisTooLongError,
   buildRunRequest,
   dataAnalysisAssetPreview,
   dataAnalysisAssetsPayload,
@@ -145,6 +146,12 @@ async function findStep(c: Context<AppEnv>) {
   return { dataAnalysis, steps, index, step: steps[index]! }
 }
 
+/** 页面上的步骤和现在库里的对不上（步数不同，或者带了 stepIds 而顺序不同）：老师刚改过这一节 */
+function stepsChanged(steps: { id: number }[], index: number, codes: string[], stepIds?: number[]) {
+  if (codes.length !== index + 1) return true
+  return !!stepIds && (stepIds.length !== codes.length || stepIds.some((id, i) => id !== steps[i]!.id))
+}
+
 /** 存第 1…k 步的代码（只改代码，不碰对错） */
 async function saveCodes(userId: number, dataAnalysisId: number, steps: { id: number }[], codes: string[]) {
   const now = new Date().toISOString()
@@ -168,6 +175,7 @@ dataAnalysisRoutes.put('/data-analyses/:id/steps/:stepId/code', requireAuth, asy
 
 function runFailure(c: Context<AppEnv>, err: unknown) {
   if (err instanceof DataAnalysisBusyError) return failure(c, 429, 'data-analysis-busy', '上一次还没跑完，稍等一下')
+  if (err instanceof DataAnalysisTooLongError) return failure(c, 400, 'data-analysis-code-too-long', '前面这几步的代码加起来太长了，删掉些用不上的再运行')
   if (err instanceof DataAnalysisRunnerError) {
     console.error('DataAnalysis run failed', err.message)
     return failure(c, 502, 'data-analysis-unavailable', '运行器暂时连不上，过一会儿再点')
@@ -190,7 +198,7 @@ dataAnalysisRoutes.post('/data-analyses/:id/steps/:stepId/run', requireAuth, asy
   if (!parsed.success) return parsed.response
   const { dataAnalysis, steps, index, step } = found
   const codes = parsed.data.codes
-  if (codes.length !== index + 1) return failure(c, 400, 'invalid-request', '代码的步数对不上，刷新一下')
+  if (stepsChanged(steps, index, codes, parsed.data.stepIds)) return failure(c, 409, 'steps-changed', '老师刚改过这一节的步骤，刷新一下再运行')
   const user = c.get('user')!
 
   let result: DataAnalysisRunResult
@@ -234,8 +242,8 @@ dataAnalysisRoutes.post('/data-analyses/:id/steps/:stepId/submit', requireAuth, 
   const parsed = await parseBody(c, submitDataAnalysisOpenRequestSchema)
   if (!parsed.success) return parsed.response
   const { dataAnalysis, steps, index, step } = found
-  const { codes, text } = parsed.data
-  if (codes.length !== index + 1) return failure(c, 400, 'invalid-request', '代码的步数对不上，刷新一下')
+  const { codes, text, stepIds } = parsed.data
+  if (stepsChanged(steps, index, codes, stepIds)) return failure(c, 409, 'steps-changed', '老师刚改过这一节的步骤，刷新一下再交')
   const user = c.get('user')!
   await saveCodes(user.id, dataAnalysis.id, steps, codes)
   const now = new Date().toISOString()
@@ -266,7 +274,8 @@ async function findAsset(c: Context<AppEnv>) {
   return asset ?? null
 }
 
-dataAnalysisRoutes.get('/data-analyses/:id/assets/:assetId/preview', optionalAuth, async (c) => {
+// 素材要登录才能看：老师传的表可能有学生真名（schema.ts 里 data_analysis_asset 那段说明）。没登录的人能看题和步骤
+dataAnalysisRoutes.get('/data-analyses/:id/assets/:assetId/preview', requireAuth, async (c) => {
   const asset = await findAsset(c)
   if (!asset) return failure(c, 404, 'asset-not-found', '这个素材不存在')
   try {
@@ -276,7 +285,7 @@ dataAnalysisRoutes.get('/data-analyses/:id/assets/:assetId/preview', optionalAut
   }
 })
 
-dataAnalysisRoutes.get('/data-analyses/:id/assets/:assetId/file', optionalAuth, async (c) => {
+dataAnalysisRoutes.get('/data-analyses/:id/assets/:assetId/file', requireAuth, async (c) => {
   const asset = await findAsset(c)
   if (!asset) return failure(c, 404, 'asset-not-found', '这个素材不存在')
   const [row] = await db.select({ data: schema.dataAnalysisAsset.data }).from(schema.dataAnalysisAsset).where(eq(schema.dataAnalysisAsset.id, asset.id))

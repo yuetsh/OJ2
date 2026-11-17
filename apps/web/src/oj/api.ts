@@ -586,12 +586,16 @@ export function saveDataAnalysisCode(dataAnalysisId: number, stepId: number, cod
   return api.put<null>(`data-analyses/${dataAnalysisId}/steps/${stepId}/code`, { code } satisfies SaveDataAnalysisCodeRequest)
 }
 
-export function runDataAnalysisStep(dataAnalysisId: number, stepId: number, codes: string[]) {
-  return api.post<DataAnalysisStepRunResponse>(`data-analyses/${dataAnalysisId}/steps/${stepId}/run`, { codes } satisfies RunDataAnalysisStepRequest)
+export function runDataAnalysisStep(dataAnalysisId: number, stepId: number, codes: string[], stepIds: number[]) {
+  return api.post<DataAnalysisStepRunResponse>(`data-analyses/${dataAnalysisId}/steps/${stepId}/run`, { codes, stepIds } satisfies RunDataAnalysisStepRequest)
 }
 
-export function submitDataAnalysisOpen(dataAnalysisId: number, stepId: number, codes: string[], text: string) {
-  return api.post<{ submittedAt: string }>(`data-analyses/${dataAnalysisId}/steps/${stepId}/submit`, { codes, text } satisfies SubmitDataAnalysisOpenRequest)
+export function submitDataAnalysisOpen(dataAnalysisId: number, stepId: number, codes: string[], stepIds: number[], text: string) {
+  return api.post<{ submittedAt: string }>(`data-analyses/${dataAnalysisId}/steps/${stepId}/submit`, {
+    codes,
+    stepIds,
+    text,
+  } satisfies SubmitDataAnalysisOpenRequest)
 }
 
 export function getDataAnalysisAssetPreviewForStudent(dataAnalysisId: number, assetId: number) {

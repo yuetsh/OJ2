@@ -27,6 +27,7 @@ import { failure, parseBody, success } from '../../http'
 import {
   DataAnalysisBusyError,
   DataAnalysisRunnerError,
+  DataAnalysisTooLongError,
   buildRunRequest,
   dataAnalysisAssetNameError,
   dataAnalysisAssetPreview,
@@ -326,6 +327,8 @@ adminDataAnalysisRoutes.post('/data-analyses/:id/trial', requireTeacher, async (
     return success(c, result satisfies DataAnalysisRunResult)
   } catch (err) {
     if (err instanceof DataAnalysisBusyError) return failure(c, 429, 'data-analysis-busy', '上一次还没跑完，稍等一下')
+    if (err instanceof DataAnalysisTooLongError)
+      return failure(c, 400, 'data-analysis-code-too-long', '到这一步为止的答案加起来太长了（运行器一次最多收 20 万字）')
     if (err instanceof DataAnalysisRunnerError) {
       console.error('DataAnalysis trial failed', err.message)
       return failure(c, 502, 'data-analysis-unavailable', '运行器暂时连不上')

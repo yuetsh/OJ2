@@ -49,6 +49,8 @@ const submitting = ref<number | null>(null)
 const dataAnalysisId = computed(() => Number(props.dataAnalysisID))
 const steps = computed(() => dataAnalysis.value?.steps ?? [])
 const doneCount = computed(() => steps.value.filter((s) => s.passed).length)
+/** 第 1…k 步各是哪一步：跟代码一起发，老师在课上调了步骤顺序时服务器能认出来，不会把代码存错步 */
+const stepIdsTo = (index: number) => steps.value.slice(0, index + 1).map((s) => s.id)
 /** 第一个还没做对的步骤，高亮它 */
 const currentIndex = computed(() => steps.value.findIndex((s) => !s.passed))
 
@@ -110,7 +112,7 @@ async function run(index: number) {
   const stepEls = document.querySelectorAll('.dataAnalysisPage .step')
   for (let i = 0; i <= index; i++) markLine(stepEls[i], null)
   try {
-    const res = await runDataAnalysisStep(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1))
+    const res = await runDataAnalysisStep(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1), stepIdsTo(index))
     results.value[index] = res
     if (res.error?.line) markLine(stepEls[res.error.step - 1], res.error.line)
     step.runs += 1
@@ -130,7 +132,7 @@ async function submit(index: number) {
   const step = steps.value[index]!
   submitting.value = index
   try {
-    const res = await submitDataAnalysisOpen(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1), openTexts.value[index]!.trim())
+    const res = await submitDataAnalysisOpen(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1), stepIdsTo(index), openTexts.value[index]!.trim())
     step.passed = true
     step.submittedAt = res.submittedAt
     step.openText = openTexts.value[index]!.trim()
@@ -162,8 +164,9 @@ function stepTag(step: DataAnalysisStep, index: number) {
 const previews = ref(new Map<number, DataAnalysisTableOutput | null>())
 const expanded = ref(new Set<number>())
 
+/** 素材可能有学生真名，预览和下载都要登录（没登录的人能看题、看步骤，看不到表里的内容） */
 async function loadPreview(asset: DataAnalysisAsset) {
-  if (!/\.(xlsx|csv)$/i.test(asset.name)) return
+  if (!userStore.isAuthed || !/\.(xlsx|csv)$/i.test(asset.name)) return
   try {
     const p = await getDataAnalysisAssetPreviewForStudent(dataAnalysisId.value, asset.id)
     previews.value = new Map(previews.value).set(asset.id, p.table)
@@ -182,7 +185,15 @@ function toggleAsset(id: number) {
 /** 补全里的列名：素材表的表头（预览读出来的那几张） */
 const completion = dataAnalysisCompletion(() => [...previews.value.values()].flatMap((t) => t?.columns ?? []))
 
+watch(
+  () => userStore.isAuthed,
+  (authed) => {
+    if (authed) dataAnalysis.value?.assets.forEach(loadPreview)
+  },
+)
+
 async function download(asset: DataAnalysisAsset) {
+  if (needLogin()) return
   if (!(await downloadFile(studentDataAnalysisAssetUrl(dataAnalysisId.value, asset.id), asset.name))) message.error('下载失败')
 }
 

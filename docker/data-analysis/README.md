@@ -9,7 +9,7 @@
 | Python | 3.13（`python:3.13-slim-trixie`，和判题机同一个大版本） |
 | 库 | 见 `requirements.txt`，全部钉死；那份文件就是学生能 import 的白名单 |
 | 中文字体 | 文泉驿微米黑（`fonts-wqy-microhei`） |
-| 镜像 | `oj2-data-analysis-2`，约 405 MB（2026-11-17 审查后补沙箱：结果文件不跟链接不阻塞地读、每次运行后按 uid 杀光残留进程并删掉它留在 /tmp、/dev/shm 的文件、跑学生代码前清掉栈上的参考答案；compose 同时加了 `init: true`。`-1` 是从 `oj2-lab-2` 改名而来，内容一样；更早的 `oj2-lab-1` 是 11-12 首次上线那版，`oj2-lab-2` 起答案的比对数据由 api 缓存） |
+| 镜像 | `oj2-data-analysis-3`，约 405 MB（`-3`：超过 5000 行、自带索引的长表比对不再崩。`-2`：2026-11-17 审查后补沙箱：结果文件不跟链接不阻塞地读、每次运行后按 uid 杀光残留进程并删掉它留在 /tmp、/dev/shm 的文件、跑学生代码前清掉栈上的参考答案；compose 同时加了 `init: true`。`-1` 是从 `oj2-lab-2` 改名而来，内容一样；更早的 `oj2-lab-1` 是 11-12 首次上线那版，`oj2-lab-2` 起答案的比对数据由 api 缓存） |
 
 ## 怎么跑起来的
 
@@ -86,13 +86,13 @@
 ## 构建、上线
 
 ```bash
-docker/data-analysis/build.sh                     # 本机构建 oj2-data-analysis-2
+docker/data-analysis/build.sh                     # 本机构建 oj2-data-analysis-3
 docker compose -f docker/compose.dev.yml up -d dataAnalysis
 bun docker/data-analysis/smoke.ts                 # 冒烟：三十来项，含 40 人并发
 DATA_ANALYSIS_SMOKE_OUT=/tmp/x bun docker/data-analysis/smoke.ts   # 顺便把图存下来，肉眼看中文有没有变方框
 ```
 
-**改了库版本、字体或这里的任何 .py，就把 `build.sh` 里的镜像名序号 +1**（下一版 `oj2-data-analysis-3`），
+**改了库版本、字体或这里的任何 .py，就把 `build.sh` 里的镜像名序号 +1**（下一版 `oj2-data-analysis-4`），
 compose 里一起改 —— 同名重建的话 `up -d` 会静默用机器上的旧镜像。
 
 上服务器和判题机一样：`build.sh --save` 出 tar，scp 过去 `docker load -i`（见 `docs/deploy.md`）。

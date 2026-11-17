@@ -164,6 +164,14 @@ await test('答案报错 → referenceError 带着答案的错', async () => {
   return r.referenceError?.type === 'ZeroDivisionError' && r.check === null ? null : JSON.stringify(r).slice(0, 300)
 })
 
+await test('超过 5000 行、索引不是 0、1、2… 的长表，后面那行错了也能说清', async () => {
+  // 索引名只留前 5000 个、数值能取到更多：原来第 5001 项之后错了直接 IndexError、运行器回 500（2026-11-17 审查）
+  const make = (bump: string) => `import pandas as pd\ns = pd.Series(range(6000), index=[f'k{i}' for i in range(6000)])${bump}`
+  const r = await run({ steps: [make('\ns.iloc[5500] = -1')], reference: [make('')], check: { kind: 'compare', vars: ['s'] } })
+  const msg = r.check?.messages[0] ?? ''
+  return r.check && !r.check.passed && msg.includes('第 5501 项') ? null : JSON.stringify(r.check ?? r.error)
+})
+
 console.log('\n报错')
 await test('第 2 步语法错 → 停在第 2 步、报行号', async () => {
   const r = await run({ steps: [step1, 'avg = df[["语文"]].mean(\nprint(avg)'] })

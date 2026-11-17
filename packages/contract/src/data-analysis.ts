@@ -211,11 +211,18 @@ export const saveDataAnalysisCodeRequestSchema = z.object({ code: z.string().max
 /** 运行第 k 步：带上第 1…k 步编辑器里的代码（前面的步骤可能改过还没存，跑的就是学生眼前那一份） */
 export const runDataAnalysisStepRequestSchema = z.object({
   codes: z.array(z.string().max(DATA_ANALYSIS_MAX_CODE)).min(1).max(DATA_ANALYSIS_MAX_STEPS),
+  /**
+   * 这几段代码各是哪一步的（和 codes 一一对应）。课上老师调了步骤顺序、学生没刷新时，只核步数会把
+   * 第 1 步的代码存到第 2 步上。可省是为了上线那一刻还开着的旧页面照样能运行。
+   */
+  stepIds: z.array(z.number().int().positive()).max(DATA_ANALYSIS_MAX_STEPS).optional(),
 })
 
 /** 开放步骤交上去：一句话 + 交的那一刻的代码（第 1…k 步，图由它现跑） */
 export const submitDataAnalysisOpenRequestSchema = z.object({
   codes: z.array(z.string().max(DATA_ANALYSIS_MAX_CODE)).min(1).max(DATA_ANALYSIS_MAX_STEPS),
+  /** 同运行 */
+  stepIds: z.array(z.number().int().positive()).max(DATA_ANALYSIS_MAX_STEPS).optional(),
   text: z.string().trim().min(1).max(500),
 })
 
