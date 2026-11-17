@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
-import type { LabDetail, LabProgress, LabRunResult, LabStudentWork } from '@oj2/contract'
+import type { DataAnalysisDetail, DataAnalysisProgress, DataAnalysisRunResult, DataAnalysisStudentWork } from '@oj2/contract'
 import CodeEditor from 'shared/components/CodeEditor.vue'
 import UserName from 'shared/components/UserName.vue'
 import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
 import { groupClassOptions } from 'utils/classes'
 import { parseTime } from 'utils/functions'
-import { getLab, getLabProgress, getLabStudentWork, runLabStudentStep } from 'oj/api'
-import LabOutputs from './components/LabOutputs.vue'
-import LabVerdict from './components/LabVerdict.vue'
+import { getDataAnalysis, getDataAnalysisProgress, getDataAnalysisStudentWork, runDataAnalysisStudentStep } from 'oj/api'
+import DataAnalysisOutputs from './components/DataAnalysisOutputs.vue'
+import DataAnalysisVerdict from './components/DataAnalysisVerdict.vue'
 import { groupProgress, studentState, type ProgressGroup, type ProgressStudent } from './utils/progress'
 
 /**
- * 老师看全班做到哪（画布 LabProgress）：顶上一条总览，左边按「卡在第几步」分组、同一步再按没过的
+ * 老师看全班做到哪（画布 DataAnalysisProgress）：顶上一条总览，左边按「卡在第几步」分组、同一步再按没过的
  * 原因细分，右边看一个学生每一步的时间、运行次数、代码和现跑出来的图。
  * 第一版不接课堂任务（设计文档第 2 节第 7 条），所以上课盯进度就靠这一页，10 秒刷新一次。
  */
-const props = defineProps<{ labID: string }>()
+const props = defineProps<{ dataAnalysisID: string }>()
 
 const theme = useThemeVars()
 const route = useRoute()
@@ -26,9 +26,9 @@ const router = useRouter()
 const message = useMessage()
 const configStore = useConfigStore()
 
-const labId = computed(() => Number(props.labID))
-const lab = ref<LabDetail | null>(null)
-const progress = ref<LabProgress | null>(null)
+const dataAnalysisId = computed(() => Number(props.dataAnalysisID))
+const dataAnalysis = ref<DataAnalysisDetail | null>(null)
+const progress = ref<DataAnalysisProgress | null>(null)
 const className = ref<string | null>(typeof route.query.className === 'string' ? route.query.className : null)
 const openGroups = ref(new Set<string>())
 const selectedId = ref<number | null>(null)
@@ -55,7 +55,7 @@ function barColor(g: ProgressGroup, i: number) {
 }
 
 async function load(first = false) {
-  const data = await getLabProgress(labId.value, className.value)
+  const data = await getDataAnalysisProgress(dataAnalysisId.value, className.value)
   progress.value = data
   className.value = data.className
   if (first) {
@@ -84,9 +84,9 @@ function toggleGroup(key: string) {
 
 // ---------------------------------------------------------------- 右边：一个学生
 
-const work = ref<LabStudentWork | null>(null)
+const work = ref<DataAnalysisStudentWork | null>(null)
 const selectedStep = ref(0)
-const stepResult = ref<LabRunResult | null>(null)
+const stepResult = ref<DataAnalysisRunResult | null>(null)
 const running = ref(false)
 
 const selected = computed(() => progress.value?.students.find((s) => s.id === selectedId.value) ?? null)
@@ -98,7 +98,7 @@ async function select(student: ProgressStudent) {
   stepResult.value = null
   const state = studentState(student)
   selectedStep.value = state.stepIndex ?? Math.max(0, student.steps.length - 1)
-  work.value = await getLabStudentWork(labId.value, student.id)
+  work.value = await getDataAnalysisStudentWork(dataAnalysisId.value, student.id)
   runSelected()
 }
 
@@ -116,7 +116,7 @@ async function runSelected() {
   const stepId = progress.value!.steps[selectedStep.value]!.id
   running.value = true
   try {
-    const result = await runLabStudentStep(labId.value, student.id, stepId)
+    const result = await runDataAnalysisStudentStep(dataAnalysisId.value, student.id, stepId)
     if (selectedId.value === student.id && progress.value!.steps[selectedStep.value]?.id === stepId) stepResult.value = result
   } catch (err) {
     message.error(errorMessage(err, '没跑起来'))
@@ -148,7 +148,7 @@ const { pause, resume } = useIntervalFn(() => {
 useEventListener(document, 'visibilitychange', () => (document.hidden ? pause() : resume()))
 
 onMounted(async () => {
-  getLab(labId.value).then((data) => (lab.value = data))
+  getDataAnalysis(dataAnalysisId.value).then((data) => (dataAnalysis.value = data))
   try {
     await load(true)
   } catch (err) {
@@ -160,14 +160,16 @@ onMounted(async () => {
 <template>
   <div class="progressPage">
     <div class="topRow">
-      <router-link :to="{ name: 'lab', params: { labID } }" class="back"> <Icon icon="ph:caret-left-bold" />{{ lab?.title ?? '这一节' }} </router-link>
+      <router-link :to="{ name: 'data analysis', params: { dataAnalysisID } }" class="back">
+        <Icon icon="ph:caret-left-bold" />{{ dataAnalysis?.title ?? '这一节' }}
+      </router-link>
       <h1 class="title">全班进度</h1>
       <span class="grow"></span>
       <label class="classPick">
         <span class="sec">班级</span>
         <n-select :value="className" :options="classOptions" placeholder="选择班级" filterable class="classSelect" @update:value="changeClass" />
       </label>
-      <n-button @click="router.push({ name: 'admin lab edit', params: { labID } })">编辑这一节</n-button>
+      <n-button @click="router.push({ name: 'admin data analysis edit', params: { dataAnalysisID } })">编辑这一节</n-button>
     </div>
 
     <n-empty v-if="progress && !progress.className" description="还没有人做过，先选一个班" />
@@ -269,13 +271,13 @@ onMounted(async () => {
               <n-text v-else depth="3" class="sec">这一步还没动过</n-text>
               <n-spin v-if="running" size="small" />
               <template v-else-if="stepResult">
-                <LabOutputs :outputs="stepResult.outputs" :truncated="stepResult.truncated" />
-                <LabVerdict
+                <DataAnalysisOutputs :outputs="stepResult.outputs" :truncated="stepResult.truncated" />
+                <DataAnalysisVerdict
                   v-if="progress.steps[selectedStep]?.kind === 'normal' || stepResult.error"
                   :result="stepResult"
                   :step="selectedStep + 1"
                   :codes="selectedCodes"
-                  :check-kind="lab?.steps[selectedStep]?.checkKind ?? 'compare'"
+                  :check-kind="dataAnalysis?.steps[selectedStep]?.checkKind ?? 'compare'"
                   teacher
                 />
               </template>

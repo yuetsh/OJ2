@@ -86,8 +86,8 @@ const NAV: NavGroup[] = [
       {
         label: '数据分析',
         icon: 'ph:chart-bar',
-        path: '/admin/lab',
-        to: '/admin/lab/list',
+        path: '/admin/data-analysis',
+        to: '/admin/data-analysis/list',
         role: 'teacher',
       },
     ],

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import type { LabTableOutput } from '@oj2/contract'
+import type { DataAnalysisTableOutput } from '@oj2/contract'
 
 /**
  * 运行器回的一张表（DataFrame / Series）。第一格是索引，灰字；文字列靠左、其余靠右，
  * 和 pandas 自己打出来的样子一致。行太多时运行器只给头尾，中间画一行 ⋯。
  * `limit` 只显示前几行（素材预览默认收着）。
  */
-const { table, limit } = defineProps<{ table: LabTableOutput; limit?: number }>()
+const { table, limit } = defineProps<{ table: DataAnalysisTableOutput; limit?: number }>()
 
 const theme = useThemeVars()
 
@@ -18,7 +18,7 @@ const numeric = computed(() => table.columns.map((_, j) => table.rows.every((row
 </script>
 
 <template>
-  <div class="labTable">
+  <div class="dataAnalysisTable">
     <table>
       <thead>
         <tr>
@@ -44,7 +44,7 @@ const numeric = computed(() => table.columns.map((_, j) => table.rows.every((row
 </template>
 
 <style scoped>
-.labTable {
+.dataAnalysisTable {
   overflow-x: auto;
   max-width: 100%;
 }

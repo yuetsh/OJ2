@@ -190,7 +190,7 @@ const TOP: Completion[] = [
 const pythonCompletion = enhanceCompletion('Python')
 
 /** `columns()` 给出素材表的列名（页面上已经读出来的预览）；每次补全时现取，素材变了不用重建编辑器 */
-export function labCompletion(columns: () => string[]): CompletionSource {
+export function dataAnalysisCompletion(columns: () => string[]): CompletionSource {
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
     // df[' 的引号里：列名
     const inQuote = context.matchBefore(/\[\s*['"][^'"\]\n]*$/)

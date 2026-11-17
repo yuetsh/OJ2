@@ -1,54 +1,61 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
-import type { LabAsset, LabDetail, LabStep, LabStepRunResponse, LabTableOutput } from '@oj2/contract'
+import type { DataAnalysisAsset, DataAnalysisDetail, DataAnalysisStep, DataAnalysisStepRunResponse, DataAnalysisTableOutput } from '@oj2/contract'
 import CodeEditor from 'shared/components/CodeEditor.vue'
 import Markdown from 'shared/components/Markdown.vue'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useUserStore } from 'shared/store/user'
 import { errorMessage } from 'utils/api'
-import { getLab, getLabAssetPreviewForStudent, runLabStep, saveLabCode, studentLabAssetUrl, submitLabOpen } from 'oj/api'
-import LabOutputs from './components/LabOutputs.vue'
-import LabTable from './components/LabTable.vue'
-import LabVerdict from './components/LabVerdict.vue'
+import {
+  getDataAnalysis,
+  getDataAnalysisAssetPreviewForStudent,
+  runDataAnalysisStep,
+  saveDataAnalysisCode,
+  studentDataAnalysisAssetUrl,
+  submitDataAnalysisOpen,
+} from 'oj/api'
+import DataAnalysisOutputs from './components/DataAnalysisOutputs.vue'
+import DataAnalysisTable from './components/DataAnalysisTable.vue'
+import DataAnalysisVerdict from './components/DataAnalysisVerdict.vue'
 import { downloadFile } from './utils/download'
-import { labLineMarkExtensions, markLine } from './utils/lineMark'
-import { labCompletion } from './utils/completion'
+import { dataAnalysisLineMarkExtensions, markLine } from './utils/lineMark'
+import { dataAnalysisCompletion } from './utils/completion'
 
 /**
- * 学生做一节「数据分析」，照画布 LabStudent：一页从头排到底（拍板：不做一次一步、不自动折叠）。
- * 规则见 docs/specs/2026-11-12-data-analysis-lab-design.md。
+ * 学生做一节「数据分析」，照画布 DataAnalysisStudent：一页从头排到底（拍板：不做一次一步、不自动折叠）。
+ * 规则见 docs/specs/2026-11-12-data-analysis-design.md。
  *
  * - 运行第 k 步时带上第 1…k 步编辑器里的代码，服务器从第 1 步重跑（运行器不留状态）。
  * - 代码停手 1.5 秒自动存一次，点运行时也一起存；换电脑接着做。
  * - 运行结果（表、图）不存，刷新就没了，再点一次运行就有。
  */
-const props = defineProps<{ labID: string }>()
+const props = defineProps<{ dataAnalysisID: string }>()
 
 const theme = useThemeVars()
 const message = useMessage()
 const userStore = useUserStore()
 const authModal = useAuthModalStore()
 
-const lab = ref<LabDetail | null>(null)
+const dataAnalysis = ref<DataAnalysisDetail | null>(null)
 const notFound = ref(false)
 const codes = ref<string[]>([])
-const results = ref<(LabStepRunResponse | null)[]>([])
+const results = ref<(DataAnalysisStepRunResponse | null)[]>([])
 const running = ref<number | null>(null)
 const showReference = ref(new Set<number>())
 const openTexts = ref<string[]>([])
 const submitting = ref<number | null>(null)
 
-const labId = computed(() => Number(props.labID))
-const steps = computed(() => lab.value?.steps ?? [])
+const dataAnalysisId = computed(() => Number(props.dataAnalysisID))
+const steps = computed(() => dataAnalysis.value?.steps ?? [])
 const doneCount = computed(() => steps.value.filter((s) => s.passed).length)
 /** 第一个还没做对的步骤，高亮它 */
 const currentIndex = computed(() => steps.value.findIndex((s) => !s.passed))
 
 async function load() {
   try {
-    const data = await getLab(labId.value)
-    lab.value = data
+    const data = await getDataAnalysis(dataAnalysisId.value)
+    dataAnalysis.value = data
     codes.value = data.steps.map((s) => s.code ?? s.starterCode)
     results.value = data.steps.map(() => null)
     openTexts.value = data.steps.map((s) => s.openText ?? '')
@@ -70,7 +77,7 @@ function onCodeChange(index: number, value: string) {
     index,
     setTimeout(() => {
       saveTimers.delete(index)
-      saveLabCode(labId.value, steps.value[index]!.id, value).catch(() => {})
+      saveDataAnalysisCode(dataAnalysisId.value, steps.value[index]!.id, value).catch(() => {})
     }, 1500),
   )
 }
@@ -79,7 +86,7 @@ onBeforeUnmount(() => {
   // 离开页面前把还没来得及存的存掉
   for (const [index, timer] of saveTimers) {
     clearTimeout(timer)
-    saveLabCode(labId.value, steps.value[index]!.id, codes.value[index]!).catch(() => {})
+    saveDataAnalysisCode(dataAnalysisId.value, steps.value[index]!.id, codes.value[index]!).catch(() => {})
   }
 })
 
@@ -100,10 +107,10 @@ async function run(index: number) {
     saveTimers.delete(i)
   }
   running.value = index
-  const stepEls = document.querySelectorAll('.labPage .step')
+  const stepEls = document.querySelectorAll('.dataAnalysisPage .step')
   for (let i = 0; i <= index; i++) markLine(stepEls[i], null)
   try {
-    const res = await runLabStep(labId.value, step.id, codes.value.slice(0, index + 1))
+    const res = await runDataAnalysisStep(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1))
     results.value[index] = res
     if (res.error?.line) markLine(stepEls[res.error.step - 1], res.error.line)
     step.runs += 1
@@ -123,7 +130,7 @@ async function submit(index: number) {
   const step = steps.value[index]!
   submitting.value = index
   try {
-    const res = await submitLabOpen(labId.value, step.id, codes.value.slice(0, index + 1), openTexts.value[index]!.trim())
+    const res = await submitDataAnalysisOpen(dataAnalysisId.value, step.id, codes.value.slice(0, index + 1), openTexts.value[index]!.trim())
     step.passed = true
     step.submittedAt = res.submittedAt
     step.openText = openTexts.value[index]!.trim()
@@ -142,7 +149,7 @@ function toggleReference(index: number) {
   showReference.value = next
 }
 
-function stepTag(step: LabStep, index: number) {
+function stepTag(step: DataAnalysisStep, index: number) {
   if (step.kind === 'open') return step.submittedAt ? { text: '交了', type: 'success' as const } : null
   if (step.passed) return { text: '做对了', type: 'success' as const }
   const r = results.value[index]
@@ -152,13 +159,13 @@ function stepTag(step: LabStep, index: number) {
 
 // ---------------------------------------------------------------- 素材
 
-const previews = ref(new Map<number, LabTableOutput | null>())
+const previews = ref(new Map<number, DataAnalysisTableOutput | null>())
 const expanded = ref(new Set<number>())
 
-async function loadPreview(asset: LabAsset) {
+async function loadPreview(asset: DataAnalysisAsset) {
   if (!/\.(xlsx|csv)$/i.test(asset.name)) return
   try {
-    const p = await getLabAssetPreviewForStudent(labId.value, asset.id)
+    const p = await getDataAnalysisAssetPreviewForStudent(dataAnalysisId.value, asset.id)
     previews.value = new Map(previews.value).set(asset.id, p.table)
   } catch {
     // 预览不了不影响做题，下载还能用
@@ -173,32 +180,32 @@ function toggleAsset(id: number) {
 }
 
 /** 补全里的列名：素材表的表头（预览读出来的那几张） */
-const completion = labCompletion(() => [...previews.value.values()].flatMap((t) => t?.columns ?? []))
+const completion = dataAnalysisCompletion(() => [...previews.value.values()].flatMap((t) => t?.columns ?? []))
 
-async function download(asset: LabAsset) {
-  if (!(await downloadFile(studentLabAssetUrl(labId.value, asset.id), asset.name))) message.error('下载失败')
+async function download(asset: DataAnalysisAsset) {
+  if (!(await downloadFile(studentDataAnalysisAssetUrl(dataAnalysisId.value, asset.id), asset.name))) message.error('下载失败')
 }
 
 onMounted(load)
 </script>
 
 <template>
-  <div class="oj-page labPage">
+  <div class="oj-page dataAnalysisPage">
     <n-result v-if="notFound" status="404" title="这一节不存在" description="可能还没公开，或者已经删掉了">
       <template #footer>
-        <n-button tag="a" href="/lab" @click.prevent="$router.push({ name: 'labs' })">回到数据分析</n-button>
+        <n-button tag="a" href="/data-analysis" @click.prevent="$router.push({ name: 'data analyses' })">回到数据分析</n-button>
       </template>
     </n-result>
 
-    <template v-else-if="lab">
+    <template v-else-if="dataAnalysis">
       <header class="head">
-        <router-link :to="{ name: 'labs' }" class="back"><Icon icon="ph:caret-left-bold" />数据分析</router-link>
+        <router-link :to="{ name: 'data analyses' }" class="back"><Icon icon="ph:caret-left-bold" />数据分析</router-link>
         <div class="titleRow">
-          <h1 class="title">{{ lab.title }}</h1>
-          <n-tag v-if="!lab.isPublic" size="small" :bordered="false">没公开</n-tag>
+          <h1 class="title">{{ dataAnalysis.title }}</h1>
+          <n-tag v-if="!dataAnalysis.isPublic" size="small" :bordered="false">没公开</n-tag>
           <template v-if="userStore.isTeacherOrAbove">
-            <n-button size="small" @click="$router.push({ name: 'lab progress', params: { labID } })">全班进度</n-button>
-            <n-button size="small" @click="$router.push({ name: 'admin lab edit', params: { labID } })">编辑</n-button>
+            <n-button size="small" @click="$router.push({ name: 'data analysis progress', params: { dataAnalysisID } })">全班进度</n-button>
+            <n-button size="small" @click="$router.push({ name: 'admin data analysis edit', params: { dataAnalysisID } })">编辑</n-button>
           </template>
           <span class="grow"></span>
           <span class="progress">
@@ -206,11 +213,11 @@ onMounted(load)
             <span class="pcount">做对 {{ doneCount }} / {{ steps.length }} 步</span>
           </span>
         </div>
-        <Markdown v-if="lab.description.trim()" :content="lab.description" class="intro" />
+        <Markdown v-if="dataAnalysis.description.trim()" :content="dataAnalysis.description" class="intro" />
       </header>
 
       <!-- 素材 -->
-      <section v-for="asset in lab.assets" :key="asset.id" class="asset">
+      <section v-for="asset in dataAnalysis.assets" :key="asset.id" class="asset">
         <div class="assetHead">
           <Icon icon="ph:file-xls" class="fileIcon" />
           <b class="assetName">{{ asset.name }}</b>
@@ -219,7 +226,7 @@ onMounted(load)
           <n-button size="small" @click="download(asset)">下载</n-button>
         </div>
         <div v-if="previews.get(asset.id)" class="assetBody">
-          <LabTable :table="previews.get(asset.id)!" :limit="expanded.has(asset.id) ? undefined : 5" />
+          <DataAnalysisTable :table="previews.get(asset.id)!" :limit="expanded.has(asset.id) ? undefined : 5" />
           <n-button v-if="previews.get(asset.id)!.shape[0] > 5" size="small" class="more" @click="toggleAsset(asset.id)">
             {{ expanded.has(asset.id) ? '收起' : `看全部 ${previews.get(asset.id)!.shape[0]} 行` }}
           </n-button>
@@ -261,19 +268,19 @@ onMounted(load)
               language="Python"
               :font-size="16"
               height="auto"
-              :extra-extensions="labLineMarkExtensions"
+              :extra-extensions="dataAnalysisLineMarkExtensions"
               :completion="completion"
               @update:value="(v: string | undefined) => onCodeChange(index, v ?? '')"
             />
           </div>
           <div v-if="results[index] && (results[index]!.outputs.length || !results[index]!.error)" class="outputs">
             <div class="outLabel">结果</div>
-            <LabOutputs :outputs="results[index]!.outputs" :truncated="results[index]!.truncated" />
+            <DataAnalysisOutputs :outputs="results[index]!.outputs" :truncated="results[index]!.truncated" />
             <n-text v-if="!results[index]!.outputs.length && !results[index]!.error" depth="3" class="empty">没有输出</n-text>
           </div>
         </div>
 
-        <LabVerdict
+        <DataAnalysisVerdict
           v-if="results[index] && (step.kind === 'normal' || results[index]!.error)"
           :result="results[index]!"
           :step="index + 1"
@@ -300,7 +307,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-.labPage {
+.dataAnalysisPage {
   max-width: 960px;
   display: flex;
   flex-direction: column;

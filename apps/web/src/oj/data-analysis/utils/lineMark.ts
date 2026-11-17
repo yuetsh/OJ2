@@ -9,7 +9,7 @@ import { Decoration, EditorView, type DecorationSet } from '@codemirror/view'
  * 标记跟着编辑挪位置，下一次运行时清掉。
  */
 const setLine = StateEffect.define<number | null>()
-const lineDeco = Decoration.line({ class: 'cm-lab-error-line' })
+const lineDeco = Decoration.line({ class: 'cm-data-analysis-error-line' })
 
 const field = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -27,11 +27,11 @@ const field = StateField.define<DecorationSet>({
 
 // 不用 baseTheme：光标停在出错那行时，代码主题的「当前行」底色会把它盖掉
 const theme = EditorView.theme({
-  '.cm-line.cm-lab-error-line': { backgroundColor: 'rgba(208, 48, 80, 0.14)' },
+  '.cm-line.cm-data-analysis-error-line': { backgroundColor: 'rgba(208, 48, 80, 0.14)' },
 })
 
 /** 传给 CodeEditor 的 extra-extensions；模块级常量，实例稳定，编辑器不会反复重配 */
-export const labLineMarkExtensions = [field, theme]
+export const dataAnalysisLineMarkExtensions = [field, theme]
 
 /** 在 `container` 里的那个编辑器上标第 `line` 行；null 清掉 */
 export function markLine(container: Element | null | undefined, line: number | null) {

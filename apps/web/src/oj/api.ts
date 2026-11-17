@@ -1,14 +1,14 @@
 import type {
-  LabAssetPreview,
-  LabDetail,
-  LabListItem,
-  LabProgress,
-  LabRunResult,
-  LabStudentWork,
-  LabStepRunResponse,
-  RunLabStepRequest,
-  SaveLabCodeRequest,
-  SubmitLabOpenRequest,
+  DataAnalysisAssetPreview,
+  DataAnalysisDetail,
+  DataAnalysisListItem,
+  DataAnalysisProgress,
+  DataAnalysisRunResult,
+  DataAnalysisStudentWork,
+  DataAnalysisStepRunResponse,
+  RunDataAnalysisStepRequest,
+  SaveDataAnalysisCodeRequest,
+  SubmitDataAnalysisOpenRequest,
   ChallengeList,
   ClassLessonRequest,
   ContestPasswordRequest,
@@ -572,46 +572,46 @@ export function reportLearnProgress(tutorialId: number, payload: { seconds: numb
   }).catch(() => undefined)
 }
 
-// ---------- 数据分析（lab） ----------
+// ---------- 数据分析（dataAnalysis） ----------
 
-export function getLabs() {
-  return api.get<LabListItem[]>('labs')
+export function getDataAnalyses() {
+  return api.get<DataAnalysisListItem[]>('data-analyses')
 }
 
-export function getLab(id: number) {
-  return api.get<LabDetail>(`labs/${id}`)
+export function getDataAnalysis(id: number) {
+  return api.get<DataAnalysisDetail>(`data-analyses/${id}`)
 }
 
-export function saveLabCode(labId: number, stepId: number, code: string) {
-  return api.put<null>(`labs/${labId}/steps/${stepId}/code`, { code } satisfies SaveLabCodeRequest)
+export function saveDataAnalysisCode(dataAnalysisId: number, stepId: number, code: string) {
+  return api.put<null>(`data-analyses/${dataAnalysisId}/steps/${stepId}/code`, { code } satisfies SaveDataAnalysisCodeRequest)
 }
 
-export function runLabStep(labId: number, stepId: number, codes: string[]) {
-  return api.post<LabStepRunResponse>(`labs/${labId}/steps/${stepId}/run`, { codes } satisfies RunLabStepRequest)
+export function runDataAnalysisStep(dataAnalysisId: number, stepId: number, codes: string[]) {
+  return api.post<DataAnalysisStepRunResponse>(`data-analyses/${dataAnalysisId}/steps/${stepId}/run`, { codes } satisfies RunDataAnalysisStepRequest)
 }
 
-export function submitLabOpen(labId: number, stepId: number, codes: string[], text: string) {
-  return api.post<{ submittedAt: string }>(`labs/${labId}/steps/${stepId}/submit`, { codes, text } satisfies SubmitLabOpenRequest)
+export function submitDataAnalysisOpen(dataAnalysisId: number, stepId: number, codes: string[], text: string) {
+  return api.post<{ submittedAt: string }>(`data-analyses/${dataAnalysisId}/steps/${stepId}/submit`, { codes, text } satisfies SubmitDataAnalysisOpenRequest)
 }
 
-export function getLabAssetPreviewForStudent(labId: number, assetId: number) {
-  return api.get<LabAssetPreview>(`labs/${labId}/assets/${assetId}/preview`)
+export function getDataAnalysisAssetPreviewForStudent(dataAnalysisId: number, assetId: number) {
+  return api.get<DataAnalysisAssetPreview>(`data-analyses/${dataAnalysisId}/assets/${assetId}/preview`)
 }
 
-export function studentLabAssetUrl(labId: number, assetId: number) {
-  return `/api/labs/${labId}/assets/${assetId}/file`
+export function studentDataAnalysisAssetUrl(dataAnalysisId: number, assetId: number) {
+  return `/api/data-analyses/${dataAnalysisId}/assets/${assetId}/file`
 }
 
-export function getLabProgress(labId: number, className?: string | null) {
-  return api.get<LabProgress>(`labs/${labId}/progress`, { params: { className: className ?? '' } })
+export function getDataAnalysisProgress(dataAnalysisId: number, className?: string | null) {
+  return api.get<DataAnalysisProgress>(`data-analyses/${dataAnalysisId}/progress`, { params: { className: className ?? '' } })
 }
 
-export function getLabStudentWork(labId: number, userId: number) {
-  return api.get<LabStudentWork>(`labs/${labId}/progress/${userId}`)
+export function getDataAnalysisStudentWork(dataAnalysisId: number, userId: number) {
+  return api.get<DataAnalysisStudentWork>(`data-analyses/${dataAnalysisId}/progress/${userId}`)
 }
 
-export function runLabStudentStep(labId: number, userId: number, stepId: number) {
-  return api.post<LabRunResult>(`labs/${labId}/progress/${userId}/steps/${stepId}/run`)
+export function runDataAnalysisStudentStep(dataAnalysisId: number, userId: number, stepId: number) {
+  return api.post<DataAnalysisRunResult>(`data-analyses/${dataAnalysisId}/progress/${userId}/steps/${stepId}/run`)
 }
 
 // ---------- 数据标注（labeling） ----------

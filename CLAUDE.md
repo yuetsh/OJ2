@@ -22,7 +22,7 @@ OJ2 是判题狗（Online Judge）的后端重写：Django 6 → Bun + TypeScrip
 | `docs/contract.md` | 动 zod 契约、想给某个字段加校验 |
 | `docs/ast-rules.md` | 动 AST 代码规则、升级 tree-sitter |
 | `docker/judge/README.md` | 换判题沙箱镜像、升语言版本（gcc / Python …） |
-| `docker/lab/README.md` | 「数据分析」运行器：换库版本、改 runner、上服务器（另一个自建镜像） |
+| `docker/data-analysis/README.md` | 「数据分析」运行器：换库版本、改 runner、上服务器（另一个自建镜像） |
 | `docs/specs/` | 设计文档：后端重写、课堂求助与协作编辑、题目详情页重设计（动题目页之前必读）、「数据分析」新板块 |
 
 ## 本机环境

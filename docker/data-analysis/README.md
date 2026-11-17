@@ -1,7 +1,7 @@
 # 「数据分析」运行器
 
 学生在「数据分析」里写的 pandas / matplotlib 代码在这里跑。设计和每条拍板见
-`docs/specs/2026-11-12-data-analysis-lab-design.md`。**和判题机（`docker/judge/`）完全分开**，
+`docs/specs/2026-11-12-data-analysis-design.md`。**和判题机（`docker/judge/`）完全分开**，
 库升级、出问题都不碰判题。
 
 | | 版本 |
@@ -9,7 +9,7 @@
 | Python | 3.13（`python:3.13-slim-trixie`，和判题机同一个大版本） |
 | 库 | 见 `requirements.txt`，全部钉死；那份文件就是学生能 import 的白名单 |
 | 中文字体 | 文泉驿微米黑（`fonts-wqy-microhei`） |
-| 镜像 | `oj2-lab-2`，约 405 MB（`-1` 是 2026-11-12 首次上线那版，`-2` 起答案的比对数据由 api 缓存） |
+| 镜像 | `oj2-data-analysis-1`，约 405 MB（2026-11-17 从 `oj2-lab-2` 改名而来，内容一样；更早的 `oj2-lab-1` 是 11-12 首次上线那版，`oj2-lab-2` 起答案的比对数据由 api 缓存） |
 
 ## 怎么跑起来的
 
@@ -36,7 +36,7 @@
 |---|---|
 | 联网 | 容器 `network_mode: none`，连 api 都不通；api 走共享目录里的 unix socket |
 | 碰 api 的连接 | 学生进程关掉了 3 号以后的全部文件描述符 |
-| 自己给自己发运行请求 | socket 权限 0600，归 api 的 uid（`LAB_SOCKET_UID`），学生的 uid 连不上 |
+| 自己给自己发运行请求 | socket 权限 0600，归 api 的 uid（`DATA_ANALYSIS_SOCKET_UID`），学生的 uid 连不上 |
 | 杀母进程、看别人的目录 | 每次运行一个独立 uid；运行目录 0700；`/tmp/runs` 0711 列不出来 |
 | 读别的实验的素材 | 素材随请求一起发、写进这次的临时目录，容器里没有素材目录 |
 | 死循环 / 吃内存 / 写大文件 / fork 炸弹 | CPU 10 秒、墙钟 20 秒（整个进程组杀掉）、地址空间 = 母进程 + 512 MB、写文件 32 MB、进程数 16 |
@@ -86,22 +86,22 @@
 ## 构建、上线
 
 ```bash
-docker/lab/build.sh                     # 本机构建 oj2-lab-2
-docker compose -f docker/compose.dev.yml up -d lab
-bun docker/lab/smoke.ts                 # 冒烟：三十来项，含 40 人并发
-LAB_SMOKE_OUT=/tmp/x bun docker/lab/smoke.ts   # 顺便把图存下来，肉眼看中文有没有变方框
+docker/data-analysis/build.sh                     # 本机构建 oj2-data-analysis-1
+docker compose -f docker/compose.dev.yml up -d dataAnalysis
+bun docker/data-analysis/smoke.ts                 # 冒烟：三十来项，含 40 人并发
+DATA_ANALYSIS_SMOKE_OUT=/tmp/x bun docker/data-analysis/smoke.ts   # 顺便把图存下来，肉眼看中文有没有变方框
 ```
 
-**改了库版本、字体或这里的任何 .py，就把 `build.sh` 里的镜像名序号 +1**（下一版 `oj2-lab-3`），
+**改了库版本、字体或这里的任何 .py，就把 `build.sh` 里的镜像名序号 +1**（下一版 `oj2-data-analysis-2`），
 compose 里一起改 —— 同名重建的话 `up -d` 会静默用机器上的旧镜像。
 
 上服务器和判题机一样：`build.sh --save` 出 tar，scp 过去 `docker load -i`（见 `docs/deploy.md`）。
-服务器的 `compose.debian.yml` 里是 `oj-lab`，和 `oj-api` 共用 `lab-run` 卷（socket 在里面，
-api 的 `LAB_SOCKET=/run/lab/lab.sock`）。在服务器上跑冒烟：
+服务器的 `compose.debian.yml` 里是 `oj-data-analysis`，和 `oj-api` 共用 `data-analysis-run` 卷（socket 在里面，
+api 的 `DATA_ANALYSIS_SOCKET=/run/data-analysis/data-analysis.sock`）。在服务器上跑冒烟：
 
 ```bash
-docker run --rm -v docker_lab-run:/run/lab -v "$PWD":/w -w /w oven/bun:1.4.4 \
-  sh -c 'LAB_SOCKET=/run/lab/lab.sock bun docker/lab/smoke.ts'
+docker run --rm -v docker_data-analysis-run:/run/data-analysis -v "$PWD":/w -w /w oven/bun:1.4.4 \
+  sh -c 'DATA_ANALYSIS_SOCKET=/run/data-analysis/data-analysis.sock bun docker/data-analysis/smoke.ts'
 ```
 
 ## 本机实测（2026-11-12，开发机 16 核，容器内并发 3）

@@ -1,17 +1,17 @@
 import {
   toAdminType,
   toProblemPermission,
-  type AdminLab,
-  type AdminLabListItem,
+  type AdminDataAnalysis,
+  type AdminDataAnalysisListItem,
   type AdminLessonList,
   type AdminLessonRequest,
-  type CreateLabRequest,
-  type ReorderLabsRequest,
-  type LabAsset,
-  type LabAssetPreview,
-  type LabRunResult,
-  type LabTrialRequest,
-  type SaveLabRequest,
+  type CreateDataAnalysisRequest,
+  type ReorderDataAnalysesRequest,
+  type DataAnalysisAsset,
+  type DataAnalysisAssetPreview,
+  type DataAnalysisRunResult,
+  type DataAnalysisTrialRequest,
+  type SaveDataAnalysisRequest,
 } from '@oj2/contract'
 import type {
   AddContestProblemRequest,
@@ -818,52 +818,52 @@ export function deleteAdminLesson(id: number) {
   return api.delete<null>(`admin/lessons/${id}`)
 }
 
-// ---------- 数据分析（lab） ----------
+// ---------- 数据分析（dataAnalysis） ----------
 
-export function getAdminLabs() {
-  return api.get<AdminLabListItem[]>('admin/labs')
+export function getAdminDataAnalyses() {
+  return api.get<AdminDataAnalysisListItem[]>('admin/data-analyses')
 }
 
-export function reorderAdminLabs(ids: number[]) {
-  return api.put<null>('admin/lab-order', { ids } satisfies ReorderLabsRequest)
+export function reorderAdminDataAnalyses(ids: number[]) {
+  return api.put<null>('admin/data-analysis-order', { ids } satisfies ReorderDataAnalysesRequest)
 }
 
-export function getAdminLab(id: number) {
-  return api.get<AdminLab>(`admin/labs/${id}`)
+export function getAdminDataAnalysis(id: number) {
+  return api.get<AdminDataAnalysis>(`admin/data-analyses/${id}`)
 }
 
-export function createAdminLab(title: string) {
-  return api.post<AdminLab>('admin/labs', { title } satisfies CreateLabRequest)
+export function createAdminDataAnalysis(title: string) {
+  return api.post<AdminDataAnalysis>('admin/data-analyses', { title } satisfies CreateDataAnalysisRequest)
 }
 
-export function saveAdminLab(id: number, body: SaveLabRequest) {
-  return api.put<AdminLab>(`admin/labs/${id}`, body)
+export function saveAdminDataAnalysis(id: number, body: SaveDataAnalysisRequest) {
+  return api.put<AdminDataAnalysis>(`admin/data-analyses/${id}`, body)
 }
 
-export function deleteAdminLab(id: number) {
-  return api.delete<null>(`admin/labs/${id}`)
+export function deleteAdminDataAnalysis(id: number) {
+  return api.delete<null>(`admin/data-analyses/${id}`)
 }
 
-export function uploadLabAsset(labId: number, file: File) {
+export function uploadDataAnalysisAsset(dataAnalysisId: number, file: File) {
   const form = new window.FormData()
   form.append('file', file)
-  return api.post<LabAsset>(`admin/labs/${labId}/assets`, form)
+  return api.post<DataAnalysisAsset>(`admin/data-analyses/${dataAnalysisId}/assets`, form)
 }
 
-export function deleteLabAsset(labId: number, assetId: number) {
-  return api.delete<null>(`admin/labs/${labId}/assets/${assetId}`)
+export function deleteDataAnalysisAsset(dataAnalysisId: number, assetId: number) {
+  return api.delete<null>(`admin/data-analyses/${dataAnalysisId}/assets/${assetId}`)
 }
 
-export function getLabAssetPreview(labId: number, assetId: number) {
-  return api.get<LabAssetPreview>(`admin/labs/${labId}/assets/${assetId}/preview`)
+export function getDataAnalysisAssetPreview(dataAnalysisId: number, assetId: number) {
+  return api.get<DataAnalysisAssetPreview>(`admin/data-analyses/${dataAnalysisId}/assets/${assetId}/preview`)
 }
 
-export function labAssetFileUrl(labId: number, assetId: number) {
-  return `/api/admin/labs/${labId}/assets/${assetId}/file`
+export function dataAnalysisAssetFileUrl(dataAnalysisId: number, assetId: number) {
+  return `/api/admin/data-analyses/${dataAnalysisId}/assets/${assetId}/file`
 }
 
-export function trialLabStep(labId: number, body: LabTrialRequest) {
-  return api.post<LabRunResult>(`admin/labs/${labId}/trial`, body)
+export function trialDataAnalysisStep(dataAnalysisId: number, body: DataAnalysisTrialRequest) {
+  return api.post<DataAnalysisRunResult>(`admin/data-analyses/${dataAnalysisId}/trial`, body)
 }
 
 // ---------- 数据标注（labeling） ----------

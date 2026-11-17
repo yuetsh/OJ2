@@ -9,7 +9,7 @@
 
 为什么 import 一次、每次 fork：import pandas + matplotlib 本身约 0.7 秒 CPU，服务器只有 2 核，
 一个班 40 人一起点运行要排十几秒；fork 出来的进程直接带着已加载的库，一次运行零点几秒。
-实测见 docs/specs/2026-11-12-data-analysis-lab-design.md 第 4.1 节。
+实测见 docs/specs/2026-11-12-data-analysis-design.md 第 4.1 节。
 
 协议见 README.md。
 """
@@ -42,14 +42,14 @@ import compare  # noqa: E402
 kernel.warm_up()
 WARM_SECONDS = time.monotonic() - _t0
 
-SOCKET = os.environ.get('LAB_SOCKET', '/run/lab/lab.sock')
+SOCKET = os.environ.get('DATA_ANALYSIS_SOCKET', '/run/data-analysis/data-analysis.sock')
 # socket 文件归谁：api 用哪个 uid 连就填哪个（容器里的 api 是 root = 0，本机 dev 是自己的 uid）。
 # 权限 0600，学生进程的 uid 连不上，免得学生代码自己给自己发运行请求。
-SOCKET_UID = int(os.environ.get('LAB_SOCKET_UID', '0'))
-CONCURRENCY = int(os.environ.get('LAB_CONCURRENCY', '3'))
-CPU_SECONDS = int(os.environ.get('LAB_CPU_SECONDS', '10'))
-WALL_SECONDS = float(os.environ.get('LAB_WALL_SECONDS', '20'))
-MEMORY_MB = int(os.environ.get('LAB_MEMORY_MB', '512'))
+SOCKET_UID = int(os.environ.get('DATA_ANALYSIS_SOCKET_UID', '0'))
+CONCURRENCY = int(os.environ.get('DATA_ANALYSIS_CONCURRENCY', '3'))
+CPU_SECONDS = int(os.environ.get('DATA_ANALYSIS_CPU_SECONDS', '10'))
+WALL_SECONDS = float(os.environ.get('DATA_ANALYSIS_WALL_SECONDS', '20'))
+MEMORY_MB = int(os.environ.get('DATA_ANALYSIS_MEMORY_MB', '512'))
 FILE_MB = 32
 RUNS_DIR = '/tmp/runs'
 
@@ -411,7 +411,7 @@ def main():
     os.chown(SOCKET, SOCKET_UID, -1)
     os.chmod(SOCKET, 0o600)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    log(f'lab runner ready on {SOCKET} (预热 {WARM_SECONDS:.2f}s, 并发 {CONCURRENCY}, {VERSIONS})')
+    log(f'data-analysis runner ready on {SOCKET} (预热 {WARM_SECONDS:.2f}s, 并发 {CONCURRENCY}, {VERSIONS})')
     server.serve_forever()
 
 

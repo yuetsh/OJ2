@@ -161,12 +161,12 @@ docker load -i /root/OJDeploy/oj2-judge-3.tar
 
 ### 「数据分析」运行器也是自建镜像
 
-`compose.debian.yml` 里的 `oj-lab`（镜像 `oj2-lab-2`）跑学生在「数据分析」里写的 pandas /
-matplotlib 代码，和判题机同一个路数：本机 `docker/lab/build.sh --save`，scp 过去 `docker load`。
+`compose.debian.yml` 里的 `oj-data-analysis`（镜像 `oj2-data-analysis-1`）跑学生在「数据分析」里写的 pandas /
+matplotlib 代码，和判题机同一个路数：本机 `docker/data-analysis/build.sh --save`，scp 过去 `docker load`。
 `deploy.sh` 起栈前会查它在不在，不在就停下并给出这三条命令。**第一次上「数据分析」时必须先 load
-它再 push**，否则 CI 部署会停在这道自检上。它不联网，和 api 之间走 `lab-run` 卷里的 unix socket；
-上线后在服务器上跑一次 `LAB_SOCKET=… bun docker/lab/smoke.ts` 量 2 核上的真实耗时。细节见
-`docker/lab/README.md`。机房那套还没部署（见下），compose.school.yml 没加它。
+它再 push**，否则 CI 部署会停在这道自检上。它不联网，和 api 之间走 `data-analysis-run` 卷里的 unix socket；
+上线后在服务器上跑一次 `DATA_ANALYSIS_SOCKET=… bun docker/data-analysis/smoke.ts` 量 2 核上的真实耗时。细节见
+`docker/data-analysis/README.md`。机房那套还没部署（见下），compose.school.yml 没加它。
 
 ### 迁移在起栈之前跑
 

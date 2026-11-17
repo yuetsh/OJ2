@@ -92,11 +92,11 @@ services:
       ES_AUTH_TOKEN: ${OJ2_JUDGE_TOKEN:?请先设置 OJ2_JUDGE_TOKEN，见本文件顶部注释}
     mem_limit: 512m
 
-  lab:
+  data-analysis:
     logging: *logging
-    # 「数据分析」的运行器（docker/lab/）。和 judge 一样是本机构建的镜像：docker/lab/build.sh
-    image: oj2-lab-2
-    container_name: oj2-lab
+    # 「数据分析」的运行器（docker/data-analysis/）。和 judge 一样是本机构建的镜像：docker/data-analysis/build.sh
+    image: oj2-data-analysis-1
+    container_name: oj2-data-analysis
     restart: unless-stopped
     # 不联网：api 走下面那个目录里的 unix socket 连它。学生代码因此碰不到库、redis、api
     network_mode: none
@@ -104,11 +104,11 @@ services:
     tmpfs:
       - /tmp:size=512m
     volumes:
-      # socket 在这里：本机 dev 的 api 用 LAB_SOCKET=data/lab-run/lab.sock 连
-      - ../data/lab-run:/run/lab
+      # socket 在这里：本机 dev 的 api 用 DATA_ANALYSIS_SOCKET=data/data-analysis-run/data-analysis.sock 连
+      - ../data/data-analysis-run:/run/data-analysis
     environment:
-      # socket 归本机用户（dev 的 api 不是 root），权限 0600。uid 不是 1000 的在 docker/.env 里设 LAB_SOCKET_UID
-      LAB_SOCKET_UID: ${LAB_SOCKET_UID:-1000}
+      # socket 归本机用户（dev 的 api 不是 root），权限 0600。uid 不是 1000 的在 docker/.env 里设 DATA_ANALYSIS_SOCKET_UID
+      DATA_ANALYSIS_SOCKET_UID: ${DATA_ANALYSIS_SOCKET_UID:-1000}
     # 母进程是 root（要给每次运行换 uid），只留它用得上的几样权限
     cap_drop: [ALL]
     cap_add: [SETUID, SETGID, CHOWN, FOWNER, DAC_OVERRIDE, KILL]

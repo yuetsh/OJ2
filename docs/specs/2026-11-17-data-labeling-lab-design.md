@@ -157,7 +157,7 @@
   `db/schema.ts`（表定义）、`apps/api/src/index.ts` 和 `routes/admin/index.ts`（挂路由）、契约 `index.ts`（出口）、
   `apps/web/src/routes.ts`（前台和后台路由）、`Header.vue` 的 `labLinks`、后台侧栏 `shared/layout/admin.vue`、
   `oj/api.ts` 和 `admin/api.ts`（各加一段，照「数据分析」那段的写法）。
-  不改题目、提交、统计、成就、看板娘的任何代码，也不复用它们的表。路径用 `/labeling`，和 `/lab` 不同的一级路径，
+  不改题目、提交、统计、成就、看板娘的任何代码，也不复用它们的表。路径用 `/labeling`，和数据分析的 `/data-analysis` 不同的一级路径，
   顶栏按一级路径判高亮，不会串。
 - **表独立**：新表只被这个板块引用，不被别的表外键指向；将来下线 = 一份 drop 迁移 + 删上面那些文件。
 - **不抢功能**：不接统计、不接成就，也就没有「删了会连累别处」的问题（第 12 条已定）。

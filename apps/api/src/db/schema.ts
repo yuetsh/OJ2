@@ -44,9 +44,9 @@ import type {
   FlowchartStatus,
   HintDiagnosis,
   JudgeStatus,
-  LabCheckKind,
-  LabFigureCheck,
-  LabStepKind,
+  DataAnalysisCheckKind,
+  DataAnalysisFigureCheck,
+  DataAnalysisStepKind,
   LabelingKind,
   LabelingBox,
   LabelingSpan,
@@ -1468,14 +1468,14 @@ export const mascotEvent = pgTable(
 )
 
 /**
- * 「数据分析」的一节（代码里叫 lab），设计见 docs/specs/2026-11-12-data-analysis-lab-design.md。
- * 下面挂 lab_step（步骤）、lab_asset（素材）、lab_progress（学生每一步的代码和对错）。
+ * 「数据分析」的一节（代码里叫 dataAnalysis），设计见 docs/specs/2026-11-12-data-analysis-design.md。
+ * 下面挂 data_analysis_step（步骤）、data_analysis_asset（素材）、data_analysis_progress（学生每一步的代码和对错）。
  */
-export const lab = pgTable(
-  'lab',
+export const dataAnalysis = pgTable(
+  'data_analysis',
   {
     id: integer().primaryKey().generatedByDefaultAsIdentity({
-      name: 'lab_id_seq',
+      name: 'data_analysis_id_seq',
       startWith: 1,
       increment: 1,
       minValue: 1,
@@ -1496,44 +1496,44 @@ export const lab = pgTable(
     foreignKey({
       columns: [table.createdById],
       foreignColumns: [user.id],
-      name: 'lab_created_by_id_fk_user_id',
+      name: 'data_analysis_created_by_id_fk_user_id',
     }),
   ],
 )
 
 /**
  * 一节里的一步。`referenceCode` 是答案：对照答案时后面的步骤拿前面各步的答案接着跑，学生做对后也能看。
- * 检查方式的三种见契约 LAB_CHECK_KINDS。步骤是一节的组成部分，lab 外键 CASCADE。
+ * 检查方式的三种见契约 DATA_ANALYSIS_CHECK_KINDS。步骤是一节的组成部分，dataAnalysis 外键 CASCADE。
  */
-export const labStep = pgTable(
-  'lab_step',
+export const dataAnalysisStep = pgTable(
+  'data_analysis_step',
   {
     id: integer().primaryKey().generatedByDefaultAsIdentity({
-      name: 'lab_step_id_seq',
+      name: 'data_analysis_step_id_seq',
       startWith: 1,
       increment: 1,
       minValue: 1,
       maxValue: 2147483647,
       cache: 1,
     }),
-    labId: integer('lab_id').notNull(),
+    dataAnalysisId: integer('data_analysis_id').notNull(),
     order: integer().notNull(),
-    kind: text().$type<LabStepKind>().notNull(),
+    kind: text().$type<DataAnalysisStepKind>().notNull(),
     title: varchar({ length: 128 }).notNull(),
     description: text().default('').notNull(),
     starterCode: text('starter_code').default('').notNull(),
     referenceCode: text('reference_code').default('').notNull(),
-    checkKind: text('check_kind').$type<LabCheckKind>().notNull(),
+    checkKind: text('check_kind').$type<DataAnalysisCheckKind>().notNull(),
     compareVars: jsonb('compare_vars').$type<string[]>().default([]).notNull(),
-    compareFigure: jsonb('compare_figure').$type<LabFigureCheck | null>(),
+    compareFigure: jsonb('compare_figure').$type<DataAnalysisFigureCheck | null>(),
     checkScript: text('check_script').default('').notNull(),
   },
   (table) => [
-    index('lab_step_lab_id_idx').on(table.labId, table.order),
+    index('data_analysis_step_data_analysis_id_idx').on(table.dataAnalysisId, table.order),
     foreignKey({
-      columns: [table.labId],
-      foreignColumns: [lab.id],
-      name: 'lab_step_lab_id_fk_lab_id',
+      columns: [table.dataAnalysisId],
+      foreignColumns: [dataAnalysis.id],
+      name: 'data_analysis_step_data_analysis_id_fk_data_analysis_id',
     }).onDelete('cascade'),
   ],
 )
@@ -1543,29 +1543,29 @@ export const labStep = pgTable(
  * 不能放进公开的 upload 目录、跟着数据库备份走，也不用给 api 容器多挂目录。
  * 只增不改：替换 = 删旧的、插新的（新 id），所以 api 可以按 id 放心缓存内容。
  */
-export const labAsset = pgTable(
-  'lab_asset',
+export const dataAnalysisAsset = pgTable(
+  'data_analysis_asset',
   {
     id: integer().primaryKey().generatedByDefaultAsIdentity({
-      name: 'lab_asset_id_seq',
+      name: 'data_analysis_asset_id_seq',
       startWith: 1,
       increment: 1,
       minValue: 1,
       maxValue: 2147483647,
       cache: 1,
     }),
-    labId: integer('lab_id').notNull(),
+    dataAnalysisId: integer('data_analysis_id').notNull(),
     name: varchar({ length: 100 }).notNull(),
     size: integer().notNull(),
     data: bytea().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
   },
   (table) => [
-    unique('lab_asset_lab_id_name_key').on(table.labId, table.name),
+    unique('data_analysis_asset_data_analysis_id_name_key').on(table.dataAnalysisId, table.name),
     foreignKey({
-      columns: [table.labId],
-      foreignColumns: [lab.id],
-      name: 'lab_asset_lab_id_fk_lab_id',
+      columns: [table.dataAnalysisId],
+      foreignColumns: [dataAnalysis.id],
+      name: 'data_analysis_asset_data_analysis_id_fk_data_analysis_id',
     }).onDelete('cascade'),
   ],
 )
@@ -1578,13 +1578,13 @@ export const labAsset = pgTable(
  * `lastFailure` 是进度页分组用的那句话（「图里应该是 4 根柱子…」/ 报错的异常名），做对了就清空。
  * 开放步骤交的东西：`openText` 一句话 + `openCode` 交的那一刻的代码（图由它现跑出来）。
  */
-export const labProgress = pgTable(
-  'lab_progress',
+export const dataAnalysisProgress = pgTable(
+  'data_analysis_progress',
   {
     userId: integer('user_id').notNull(),
     stepId: integer('step_id').notNull(),
-    // 冗余一份，进度页按节查不用再连 lab_step
-    labId: integer('lab_id').notNull(),
+    // 冗余一份，进度页按节查不用再连 data_analysis_step
+    dataAnalysisId: integer('data_analysis_id').notNull(),
     code: text().default('').notNull(),
     runs: integer().default(0).notNull(),
     lastRunAt: timestamp('last_run_at', { withTimezone: true, mode: 'string' }),
@@ -1596,29 +1596,29 @@ export const labProgress = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.userId, table.stepId], name: 'lab_progress_pkey' }),
-    index('lab_progress_lab_id_idx').on(table.labId),
+    primaryKey({ columns: [table.userId, table.stepId], name: 'data_analysis_progress_pkey' }),
+    index('data_analysis_progress_data_analysis_id_idx').on(table.dataAnalysisId),
     // 和 exercise_attempt 同一档：账号、步骤没了，这些留痕就没意义
     foreignKey({
       columns: [table.userId],
       foreignColumns: [user.id],
-      name: 'lab_progress_user_id_fk_user_id',
+      name: 'data_analysis_progress_user_id_fk_user_id',
     }).onDelete('cascade'),
     foreignKey({
       columns: [table.stepId],
-      foreignColumns: [labStep.id],
-      name: 'lab_progress_step_id_fk_lab_step_id',
+      foreignColumns: [dataAnalysisStep.id],
+      name: 'data_analysis_progress_step_id_fk_data_analysis_step_id',
     }).onDelete('cascade'),
     foreignKey({
-      columns: [table.labId],
-      foreignColumns: [lab.id],
-      name: 'lab_progress_lab_id_fk_lab_id',
+      columns: [table.dataAnalysisId],
+      foreignColumns: [dataAnalysis.id],
+      name: 'data_analysis_progress_data_analysis_id_fk_data_analysis_id',
     }).onDelete('cascade'),
   ],
 )
 
 /**
- * 「数据标注」的一节（代码里叫 labeling），设计见 docs/specs/2026-11-17-data-labeling-lab-design.md。
+ * 「数据标注」的一节（代码里叫 labeling），设计见 docs/specs/2026-11-17-data-labeling-data-analysis-design.md。
  * 实验室板块、试验性质：下面三张表只被这个板块用，别的表不外键指向它们，下线就是一份 drop 迁移。
  * `kind` 建节时定、之后不改（text 文字分类 / image 图片分类 / span 实体标注 / box 框选）；`labels` 是这一节的标签（实体标注里是类别）。
  */
@@ -1694,7 +1694,7 @@ export const labelingItem = pgTable(
 )
 
 /**
- * 学生 × 条目一行：第一次交的是什么、错了几次、标对的时间。存聚合不存流水，和 lab_progress 一个路数。
+ * 学生 × 条目一行：第一次交的是什么、错了几次、标对的时间。存聚合不存流水，和 data_analysis_progress 一个路数。
  *
  * 「第一次就对没有」「最常标成什么」**不落库**，由 `firstLabel` / `firstSpans` / `firstBoxes` 对照**当前**答案现算 ——
  * 老师改了答案，统计跟着变；`passedAt` 保留（学生当时按当时的答案标对了，不打回去）。见设计文档第 8 节。
@@ -1717,7 +1717,7 @@ export const labelingAnswer = pgTable(
   (table) => [
     primaryKey({ columns: [table.userId, table.itemId], name: 'labeling_answer_pkey' }),
     index('labeling_answer_labeling_id_idx').on(table.labelingId),
-    // 和 lab_progress 同一档：账号、条目没了，这些作答就没意义
+    // 和 data_analysis_progress 同一档：账号、条目没了，这些作答就没意义
     foreignKey({
       columns: [table.userId],
       foreignColumns: [user.id],

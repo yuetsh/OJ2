@@ -1,13 +1,13 @@
-import type { LabProgress } from '@oj2/contract'
+import type { DataAnalysisProgress } from '@oj2/contract'
 
 /**
- * 全班进度的分组（画布 LabProgress）：按「卡在第几步」分组，同一步再按没过的原因细分。
+ * 全班进度的分组（画布 DataAnalysisProgress）：按「卡在第几步」分组，同一步再按没过的原因细分。
  * 老师上课想知道的是「大部分人卡在哪、要不要停下来统一讲」，不是一张学生 × 步骤的大表。
  *
  * 「卡在第几步」= 学生动过手的最后一步：那一步没过就卡在那一步；过了就卡在下一步（还没运行过）。
  * 前面跳过没做的步骤不管 —— 学生可能直接跑第 3 步（第 1、2 步的代码跟着一起跑了）。
  */
-export type ProgressStudent = LabProgress['students'][number]
+export type ProgressStudent = DataAnalysisProgress['students'][number]
 
 export interface ProgressReason {
   label: string
@@ -75,7 +75,7 @@ export function studentState(student: ProgressStudent): StudentState {
   return first > last ? { kind: 'stuck', stepIndex: first, tried: false } : { kind: 'stuck', stepIndex: first, tried: cells[first]!.runs > 0 }
 }
 
-export function groupProgress(progress: LabProgress): ProgressGroup[] {
+export function groupProgress(progress: DataAnalysisProgress): ProgressGroup[] {
   const stuck = new Map<number, ProgressStudent[]>()
   const done: ProgressStudent[] = []
   const idle: ProgressStudent[] = []

@@ -83,8 +83,8 @@ const envSchema = z.object({
   RUFF_PATH: text('ruff'),
   CLANG_FORMAT_PATH: text('clang-format'),
   PYTHON_PATH: text('python3'),
-  // 「数据分析」运行器（docker/lab/）的 unix socket。dev compose 把它挂在仓库的 data/lab-run 下
-  LAB_SOCKET: text('data/lab-run/lab.sock'),
+  // 「数据分析」运行器（docker/data-analysis/）的 unix socket。dev compose 把它挂在仓库的 data/data-analysis-run 下
+  DATA_ANALYSIS_SOCKET: text('data/data-analysis-run/data-analysis.sock'),
 })
 
 function parseEnv() {
@@ -170,5 +170,5 @@ export const config = {
   clangFormatPath: env.CLANG_FORMAT_PATH,
   /** 提交前的 Python 语法检查用（services/format-code.ts），要和判题机同一个大版本 */
   pythonPath: env.PYTHON_PATH,
-  labSocket: repoPath(env.LAB_SOCKET),
+  dataAnalysisSocket: repoPath(env.DATA_ANALYSIS_SOCKET),
 }

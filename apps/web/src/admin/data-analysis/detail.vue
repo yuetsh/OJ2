@@ -1,55 +1,71 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import type { AdminLab, LabAsset, LabCheckKind, LabRunResult, LabStepInput, LabTableOutput, SaveLabRequest } from '@oj2/contract'
+import type {
+  AdminDataAnalysis,
+  DataAnalysisAsset,
+  DataAnalysisCheckKind,
+  DataAnalysisRunResult,
+  DataAnalysisStepInput,
+  DataAnalysisTableOutput,
+  SaveDataAnalysisRequest,
+} from '@oj2/contract'
 import CodeEditor from 'shared/components/CodeEditor.vue'
 import Markdown from 'shared/components/Markdown.vue'
 import MarkdownEditor from 'shared/components/MarkdownEditor.vue'
 import { errorMessage } from 'utils/api'
-import LabOutputs from 'oj/lab/components/LabOutputs.vue'
-import LabTable from 'oj/lab/components/LabTable.vue'
-import LabVerdict from 'oj/lab/components/LabVerdict.vue'
-import { downloadFile } from 'oj/lab/utils/download'
-import { labCompletion } from 'oj/lab/utils/completion'
+import DataAnalysisOutputs from 'oj/data-analysis/components/DataAnalysisOutputs.vue'
+import DataAnalysisTable from 'oj/data-analysis/components/DataAnalysisTable.vue'
+import DataAnalysisVerdict from 'oj/data-analysis/components/DataAnalysisVerdict.vue'
+import { downloadFile } from 'oj/data-analysis/utils/download'
+import { dataAnalysisCompletion } from 'oj/data-analysis/utils/completion'
 import PageHeader from '../components/PageHeader.vue'
 import PreviewStrip from '../problem/components/PreviewStrip.vue'
 import { usePreviewCollapsed } from '../problem/components/previewCollapse'
-import { deleteLabAsset, getAdminLab, getLabAssetPreview, labAssetFileUrl, saveAdminLab, trialLabStep, uploadLabAsset } from '../api'
+import {
+  deleteDataAnalysisAsset,
+  getAdminDataAnalysis,
+  getDataAnalysisAssetPreview,
+  dataAnalysisAssetFileUrl,
+  saveAdminDataAnalysis,
+  trialDataAnalysisStep,
+  uploadDataAnalysisAsset,
+} from '../api'
 
 /**
- * 后台「数据分析」出题页，照画布 LabEdit：左边写，右边是学生看到的样子（和编程题出题页同一个结构）。
- * 规则见 docs/specs/2026-11-12-data-analysis-lab-design.md 第 3、6 节。
+ * 后台「数据分析」出题页，照画布 DataAnalysisEdit：左边写，右边是学生看到的样子（和编程题出题页同一个结构）。
+ * 规则见 docs/specs/2026-11-12-data-analysis-design.md 第 3、6 节。
  *
  * - 整节一个「保存」；素材上传、删除是即时的（素材要先在库里，试跑才读得到）。
  * - 「试跑这一步」用编辑器里还没存的答案，从第 1 步跑到这一步；改了这一步或前面的步骤，结果就作废。
  */
-const props = defineProps<{ labID: string }>()
+const props = defineProps<{ dataAnalysisID: string }>()
 
 const message = useMessage()
 const dialog = useDialog()
 const theme = useThemeVars()
 
-type StepForm = LabStepInput & { key: number }
+type StepForm = DataAnalysisStepInput & { key: number }
 
-const lab = ref<AdminLab | null>(null)
+const dataAnalysis = ref<AdminDataAnalysis | null>(null)
 const form = reactive<{ title: string; description: string; isPublic: boolean; steps: StepForm[] }>({
   title: '',
   description: '',
   isPublic: false,
   steps: [],
 })
-const assets = ref<LabAsset[]>([])
+const assets = ref<DataAnalysisAsset[]>([])
 const openKey = ref<number | null>(null)
 const saving = ref(false)
 let nextKey = 1
 let baseline = ''
 
 const previewCollapsed = usePreviewCollapsed()
-const labId = computed(() => Number(props.labID))
+const dataAnalysisId = computed(() => Number(props.dataAnalysisID))
 
 // ---------------------------------------------------------------- 读、存
 
-function toForm(data: AdminLab) {
-  lab.value = data
+function toForm(data: AdminDataAnalysis) {
+  dataAnalysis.value = data
   form.title = data.title
   form.description = data.description
   form.isPublic = data.isPublic
@@ -58,7 +74,7 @@ function toForm(data: AdminLab) {
   baseline = snapshot()
 }
 
-function toBody(): SaveLabRequest {
+function toBody(): SaveDataAnalysisRequest {
   return {
     title: form.title,
     description: form.description,
@@ -71,22 +87,22 @@ function snapshot() {
   return JSON.stringify(toBody())
 }
 
-const dirty = computed(() => lab.value !== null && snapshot() !== baseline)
+const dirty = computed(() => dataAnalysis.value !== null && snapshot() !== baseline)
 
 async function load() {
-  toForm(await getAdminLab(labId.value))
+  toForm(await getAdminDataAnalysis(dataAnalysisId.value))
   openKey.value = form.steps[0]?.key ?? null
   assets.value.forEach(loadColumns)
 }
 
 /** 补全里的列名：表格类素材的表头。进页面读一遍，上传新素材后也读 */
 const assetColumns = ref(new Map<number, string[]>())
-const completion = labCompletion(() => [...assetColumns.value.values()].flat())
+const completion = dataAnalysisCompletion(() => [...assetColumns.value.values()].flat())
 
-async function loadColumns(asset: LabAsset) {
+async function loadColumns(asset: DataAnalysisAsset) {
   if (!/\.(xlsx|csv)$/i.test(asset.name)) return
   try {
-    const p = await getLabAssetPreview(labId.value, asset.id)
+    const p = await getDataAnalysisAssetPreview(dataAnalysisId.value, asset.id)
     if (p.table) assetColumns.value = new Map(assetColumns.value).set(asset.id, p.table.columns)
   } catch {
     // 读不出来就没有列名补全，不影响出题
@@ -96,12 +112,12 @@ async function loadColumns(asset: LabAsset) {
 async function save() {
   saving.value = true
   try {
-    const saved = await saveAdminLab(labId.value, toBody())
+    const saved = await saveAdminDataAnalysis(dataAnalysisId.value, toBody())
     // 新建的步骤拿回 id；顺序和发出去的一样
     saved.steps.forEach((s, i) => {
       if (form.steps[i]) form.steps[i].id = s.id
     })
-    lab.value = saved
+    dataAnalysis.value = saved
     baseline = snapshot()
     message.success('存好了')
   } catch (err) {
@@ -202,7 +218,7 @@ function addVar(step: StepForm) {
   extraVar.value = ''
 }
 
-function setCheckKind(step: StepForm, kind: LabCheckKind) {
+function setCheckKind(step: StepForm, kind: DataAnalysisCheckKind) {
   step.checkKind = kind
 }
 
@@ -214,7 +230,7 @@ function codeHeight(code: string, minLines: number, maxLines: number) {
 // ---------------------------------------------------------------- 试跑
 
 interface Trial {
-  result: LabRunResult
+  result: DataAnalysisRunResult
   /** 跑的那一刻第 1…这一步的内容；内容变了结果就作废 */
   signature: string
 }
@@ -240,7 +256,7 @@ async function trial(index: number) {
   const step = form.steps[index]!
   trialing.value = step.key
   try {
-    const result = await trialLabStep(labId.value, { steps: toBody().steps, index })
+    const result = await trialDataAnalysisStep(dataAnalysisId.value, { steps: toBody().steps, index })
     const next = new Map(trials.value)
     next.set(step.key, { result, signature: signatureOf(index) })
     trials.value = next
@@ -259,8 +275,8 @@ function referenceOf(step: StepForm) {
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const uploading = ref(false)
-const previewAsset = ref<LabAsset | null>(null)
-const previewTable = ref<LabTableOutput | null>(null)
+const previewAsset = ref<DataAnalysisAsset | null>(null)
+const previewTable = ref<DataAnalysisTableOutput | null>(null)
 const previewError = ref<string | null>(null)
 
 async function onPickFile(event: Event) {
@@ -270,7 +286,7 @@ async function onPickFile(event: Event) {
   if (!file) return
   uploading.value = true
   try {
-    const asset = await uploadLabAsset(labId.value, file)
+    const asset = await uploadDataAnalysisAsset(dataAnalysisId.value, file)
     assets.value = [...assets.value.filter((a) => a.name !== asset.name), asset].sort((a, b) => a.name.localeCompare(b.name))
     loadColumns(asset)
   } catch (err) {
@@ -280,7 +296,7 @@ async function onPickFile(event: Event) {
   }
 }
 
-function removeAsset(asset: LabAsset) {
+function removeAsset(asset: DataAnalysisAsset) {
   dialog.warning({
     title: `删掉「${asset.name}」？`,
     content: '代码里读这个文件的步骤会跑不通。',
@@ -288,7 +304,7 @@ function removeAsset(asset: LabAsset) {
     negativeText: '算了',
     onPositiveClick: async () => {
       try {
-        await deleteLabAsset(labId.value, asset.id)
+        await deleteDataAnalysisAsset(dataAnalysisId.value, asset.id)
         assets.value = assets.value.filter((a) => a.id !== asset.id)
         const columns = new Map(assetColumns.value)
         columns.delete(asset.id)
@@ -300,12 +316,12 @@ function removeAsset(asset: LabAsset) {
   })
 }
 
-async function openPreview(asset: LabAsset) {
+async function openPreview(asset: DataAnalysisAsset) {
   previewAsset.value = asset
   previewTable.value = null
   previewError.value = null
   try {
-    const p = await getLabAssetPreview(labId.value, asset.id)
+    const p = await getDataAnalysisAssetPreview(dataAnalysisId.value, asset.id)
     previewTable.value = p.table
     previewError.value = p.error ?? (p.table ? null : '这种文件看不了表格，下载下来看')
   } catch (err) {
@@ -313,8 +329,8 @@ async function openPreview(asset: LabAsset) {
   }
 }
 
-async function download(asset: LabAsset) {
-  if (!(await downloadFile(labAssetFileUrl(labId.value, asset.id), asset.name))) message.error('下载失败')
+async function download(asset: DataAnalysisAsset) {
+  if (!(await downloadFile(dataAnalysisAssetFileUrl(dataAnalysisId.value, asset.id), asset.name))) message.error('下载失败')
 }
 
 function sizeText(bytes: number) {
@@ -334,13 +350,13 @@ onMounted(load)
 </script>
 
 <template>
-  <PageHeader :title="lab ? '编辑数据分析' : '数据分析'" :back="{ name: 'admin lab list' }">
+  <PageHeader :title="dataAnalysis ? '编辑数据分析' : '数据分析'" :back="{ name: 'admin data analysis list' }">
     <template #extra>
-      <n-text v-if="lab" depth="3" class="note">{{ lab.createdBy.username }} 出的</n-text>
+      <n-text v-if="dataAnalysis" depth="3" class="note">{{ dataAnalysis.createdBy.username }} 出的</n-text>
     </template>
   </PageHeader>
 
-  <div v-if="lab" class="labEditor" :class="{ collapsed: previewCollapsed }">
+  <div v-if="dataAnalysis" class="dataAnalysisEditor" :class="{ collapsed: previewCollapsed }">
     <!-- 左：写 -->
     <div class="write">
       <section class="card">
@@ -410,7 +426,7 @@ onMounted(load)
           <template v-if="step.kind === 'normal'">
             <div class="row">
               <span class="label">怎么算做对</span>
-              <n-radio-group :value="step.checkKind" size="small" @update:value="(v: LabCheckKind) => setCheckKind(step, v)">
+              <n-radio-group :value="step.checkKind" size="small" @update:value="(v: DataAnalysisCheckKind) => setCheckKind(step, v)">
                 <n-radio-button value="none">不检查</n-radio-button>
                 <n-radio-button value="compare">对照答案</n-radio-button>
                 <n-radio-button value="script">检查脚本</n-radio-button>
@@ -491,7 +507,7 @@ onMounted(load)
         <n-button type="primary" :loading="saving" :disabled="!dirty" @click="save">保存</n-button>
         <n-text depth="3" class="small">{{ dirty ? '有改动还没保存' : '都存好了' }}</n-text>
         <span class="grow"></span>
-        <n-button @click="$router.push({ name: 'lab progress', params: { labID } })">看全班进度</n-button>
+        <n-button @click="$router.push({ name: 'data analysis progress', params: { dataAnalysisID } })">看全班进度</n-button>
       </div>
     </div>
 
@@ -514,12 +530,12 @@ onMounted(load)
           <div class="outputs">
             <template v-if="previewResult">
               <n-text depth="3" class="small">结果 · 用答案跑的</n-text>
-              <LabOutputs :outputs="previewResult.outputs" :truncated="previewResult.truncated" />
+              <DataAnalysisOutputs :outputs="previewResult.outputs" :truncated="previewResult.truncated" />
             </template>
             <n-text v-else depth="3" class="small">试跑后这里显示运行结果</n-text>
           </div>
         </div>
-        <LabVerdict
+        <DataAnalysisVerdict
           v-if="previewResult"
           :result="previewResult"
           :step="previewIndex + 1"
@@ -541,7 +557,7 @@ onMounted(load)
     :bordered="false"
     @update:show="previewAsset = null"
   >
-    <div v-if="previewTable" class="previewBox"><LabTable :table="previewTable" /></div>
+    <div v-if="previewTable" class="previewBox"><DataAnalysisTable :table="previewTable" /></div>
     <n-text v-else-if="previewError" depth="3">{{ previewError }}</n-text>
     <n-spin v-else size="small" />
     <n-text v-if="previewTable" depth="3" class="small shape">{{ previewTable.shape[0] }} 行 × {{ previewTable.shape[1] }} 列</n-text>
@@ -555,20 +571,20 @@ onMounted(load)
 }
 
 /* 和编程题出题页一样：写的一边大，看的一边小，右栏能收起 */
-.labEditor {
+.dataAnalysisEditor {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 20px;
   align-items: start;
 }
 
-.labEditor.collapsed {
+.dataAnalysisEditor.collapsed {
   grid-template-columns: minmax(0, 1fr) 36px;
 }
 
 @media (max-width: 1180px) {
-  .labEditor,
-  .labEditor.collapsed {
+  .dataAnalysisEditor,
+  .dataAnalysisEditor.collapsed {
     grid-template-columns: minmax(0, 1fr);
   }
 }

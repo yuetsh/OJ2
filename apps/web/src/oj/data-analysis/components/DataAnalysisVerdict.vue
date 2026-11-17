@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
 import { Icon } from '@iconify/vue'
-import type { LabCheckKind, LabRunResult } from '@oj2/contract'
-import { explainLabError } from '../utils/labError'
+import type { DataAnalysisCheckKind, DataAnalysisRunResult } from '@oj2/contract'
+import { explainDataAnalysisError } from '../utils/dataAnalysisError'
 
 /**
  * 运行完的那一句结论：做对了 / 还没对（差在哪）/ 报错了（第几行、什么错）。
@@ -17,18 +17,18 @@ const {
   checkKind,
   teacher = false,
 } = defineProps<{
-  result: LabRunResult
+  result: DataAnalysisRunResult
   /** 这次跑的是第几步，从 1 数 */
   step: number
   codes: string[]
-  checkKind: LabCheckKind
+  checkKind: DataAnalysisCheckKind
   teacher?: boolean
 }>()
 
 const theme = useThemeVars()
 
-const error = computed(() => (result.error ? explainLabError(result.error, codes[result.error.step - 1] ?? '') : null))
-const refError = computed(() => (result.referenceError ? explainLabError(result.referenceError) : null))
+const error = computed(() => (result.error ? explainDataAnalysisError(result.error, codes[result.error.step - 1] ?? '') : null))
+const refError = computed(() => (result.referenceError ? explainDataAnalysisError(result.referenceError) : null))
 
 function where(e: { step: number; line: number | null }) {
   const stepPart = e.step !== step ? `第 ${e.step} 步` : ''

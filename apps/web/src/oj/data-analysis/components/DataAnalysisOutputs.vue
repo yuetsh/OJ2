@@ -1,19 +1,19 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import type { LabOutput } from '@oj2/contract'
-import LabTable from './LabTable.vue'
+import type { DataAnalysisOutput } from '@oj2/contract'
+import DataAnalysisTable from './DataAnalysisTable.vue'
 
 /** 一步运行出来的东西，按出现的顺序排：print 的文字、表、图。学生页和出题页的预览共用 */
-const { outputs, truncated = false } = defineProps<{ outputs: LabOutput[]; truncated?: boolean }>()
+const { outputs, truncated = false } = defineProps<{ outputs: DataAnalysisOutput[]; truncated?: boolean }>()
 
 const theme = useThemeVars()
 </script>
 
 <template>
-  <div class="labOutputs">
+  <div class="dataAnalysisOutputs">
     <template v-for="(out, i) in outputs" :key="i">
       <pre v-if="out.kind === 'text'" class="text">{{ out.text }}</pre>
-      <LabTable v-else-if="out.kind === 'table'" :table="out" />
+      <DataAnalysisTable v-else-if="out.kind === 'table'" :table="out" />
       <img v-else :src="`data:image/png;base64,${out.png}`" alt="运行画出来的图" class="image" />
     </template>
     <n-text v-if="truncated" depth="3" class="note">打印的东西太多，后面的没显示</n-text>
@@ -21,7 +21,7 @@ const theme = useThemeVars()
 </template>
 
 <style scoped>
-.labOutputs {
+.dataAnalysisOutputs {
   display: flex;
   flex-direction: column;
   gap: 10px;

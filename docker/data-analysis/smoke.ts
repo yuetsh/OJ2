@@ -1,9 +1,9 @@
 /**
  * 「数据分析」运行器冒烟测试 —— **换镜像或改了 runner / kernel / compare 之后跑这个**（项目不写测试，验证一律实跑）。
  *
- *   bun docker/lab/smoke.ts                                  # 连 data/lab-run/lab.sock（dev compose 的位置）
- *   LAB_SOCKET=/path/to/lab.sock bun docker/lab/smoke.ts
- *   LAB_SMOKE_OUT=/tmp/x bun docker/lab/smoke.ts             # 顺便把画出来的图存下来，肉眼看中文有没有变方框
+ *   bun docker/data-analysis/smoke.ts                                  # 连 data/data-analysis-run/data-analysis.sock（dev compose 的位置）
+ *   DATA_ANALYSIS_SOCKET=/path/to/data-analysis.sock bun docker/data-analysis/smoke.ts
+ *   DATA_ANALYSIS_SMOKE_OUT=/tmp/x bun docker/data-analysis/smoke.ts             # 顺便把画出来的图存下来，肉眼看中文有没有变方框
  *
  * 直接打 unix socket，不经过 api。核的是：
  *   1. 设计稿里那节课（读表 → 平均分 → 柱状图）三步各自的对错和说法
@@ -15,8 +15,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const socket = process.env.LAB_SOCKET ?? join(import.meta.dir, '../../data/lab-run/lab.sock')
-const outDir = process.env.LAB_SMOKE_OUT
+const socket = process.env.DATA_ANALYSIS_SOCKET ?? join(import.meta.dir, '../../data/data-analysis-run/data-analysis.sock')
+const outDir = process.env.DATA_ANALYSIS_SMOKE_OUT
 if (outDir) mkdirSync(outDir, { recursive: true })
 
 const xlsx = readFileSync(join(import.meta.dir, 'fixtures/成绩.xlsx')).toString('base64')
@@ -46,7 +46,7 @@ interface RunResult {
 }
 
 async function call(path: string, body?: unknown): Promise<{ status: number; json: any }> {
-  const res = await fetch(`http://lab${path}`, {
+  const res = await fetch(`http://data-analysis${path}`, {
     unix: socket,
     method: body === undefined ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -207,7 +207,7 @@ await test('杀不了母进程', async () => {
   return r.error?.type === 'PermissionError' ? null : JSON.stringify(r.error)
 })
 await test('连不上运行器自己的 socket', async () => {
-  const r = await run({ steps: ['import socket\ns = socket.socket(socket.AF_UNIX)\ns.connect("/run/lab/lab.sock")'] })
+  const r = await run({ steps: ['import socket\ns = socket.socket(socket.AF_UNIX)\ns.connect("/run/data-analysis/data-analysis.sock")'] })
   return r.error?.type === 'PermissionError' ? null : JSON.stringify(r.error)
 })
 await test('列不出别人的运行目录', async () => {
@@ -215,7 +215,7 @@ await test('列不出别人的运行目录', async () => {
   return r.error?.type === 'PermissionError' ? null : JSON.stringify(r.error)
 })
 await test('写不了根目录', async () => {
-  const r = await run({ steps: ['open("/opt/lab/kernel.py", "w")'] })
+  const r = await run({ steps: ['open("/opt/data-analysis/kernel.py", "w")'] })
   return r.error && ['PermissionError', 'OSError'].includes(r.error.type) ? null : JSON.stringify(r.error)
 })
 await test('fork 炸弹被进程数限住', async () => {

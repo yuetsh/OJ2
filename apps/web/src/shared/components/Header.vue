@@ -113,7 +113,7 @@ const navLinks = computed<NavLink[]>(() =>
  */
 const labLinks: NavLink[] = [
   { key: 'labeling', label: '数据标注', to: '/labeling' },
-  { key: 'lab', label: '数据分析', to: '/lab' },
+  { key: 'data-analysis', label: '数据分析', to: '/data-analysis' },
 ]
 const labMenu: DropdownOption[] = labLinks.map((link) => ({ label: link.label, key: link.key }))
 const labActive = computed(() => labLinks.some((link) => link.key === active.value))

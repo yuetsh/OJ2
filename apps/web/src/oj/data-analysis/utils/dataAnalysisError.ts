@@ -1,15 +1,15 @@
-import type { LabRunError } from '@oj2/contract'
+import type { DataAnalysisRunError } from '@oj2/contract'
 import { explainPythonCompileError } from 'utils/pythonError'
 
 /**
  * 「数据分析」运行出错时给学生看的中文。界面上不出现英文（异常名、原文只给老师看）。
  *
- * 运行器回的是 Python 的异常名 + 原文消息（docker/lab/kernel.py 的 error_info），
+ * 运行器回的是 Python 的异常名 + 原文消息（docker/data-analysis/kernel.py 的 error_info），
  * 这里按数据分析课最常见的几种错写说法：列名写错（KeyError）、文件名写错、变量没定义 ……
  * 语法错误走题目页那套编译错误的翻译（utils/pythonError.ts）。
  */
 
-/** 运行器的库白名单，和 docker/lab/requirements.txt 对齐 */
+/** 运行器的库白名单，和 docker/data-analysis/requirements.txt 对齐 */
 const LIBRARIES = 'pandas、numpy、matplotlib、seaborn、openpyxl、jieba、wordcloud'
 
 function quoted(message: string) {
@@ -17,7 +17,7 @@ function quoted(message: string) {
   return /['"]([^'"]+)['"]/.exec(message)?.[1] ?? null
 }
 
-const BY_TYPE: Record<string, (e: LabRunError) => string> = {
+const BY_TYPE: Record<string, (e: DataAnalysisRunError) => string> = {
   NameError: (e) => {
     const name = quoted(e.message)
     return name ? `用到了还没有的「${name}」：检查名字有没有写错，或者是不是在前面那一步里定义的、那一步还没写对。` : '用到了一个还没有定义的名字。'
@@ -52,14 +52,14 @@ const BY_TYPE: Record<string, (e: LabRunError) => string> = {
   Crashed: () => '程序意外退出了，多半是用的内存太多。',
 }
 
-export interface LabErrorExplanation {
+export interface DataAnalysisErrorExplanation {
   /** 第几步，从 1 数 */
   step: number
   line: number | null
   message: string
 }
 
-export function explainLabError(error: LabRunError, code = ''): LabErrorExplanation {
+export function explainDataAnalysisError(error: DataAnalysisRunError, code = ''): DataAnalysisErrorExplanation {
   if (error.type === 'SyntaxError' || error.type === 'IndentationError' || error.type === 'TabError') {
     const compiled = explainPythonCompileError(error.traceback, code)
     return { step: error.step, line: compiled?.line ?? error.line, message: compiled?.message ?? '代码的写法有错，Python 看不懂这一行。' }

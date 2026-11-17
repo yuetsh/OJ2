@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
-import type { LabListItem } from '@oj2/contract'
-import { getLabs } from 'oj/api'
+import type { DataAnalysisListItem } from '@oj2/contract'
+import { getDataAnalyses } from 'oj/api'
 
 /** 「数据分析」列表：一节一行，整行可点；登录了的显示自己做到哪 */
 const theme = useThemeVars()
-const labs = ref<LabListItem[]>([])
+const dataAnalyses = ref<DataAnalysisListItem[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    labs.value = await getLabs()
+    dataAnalyses.value = await getDataAnalyses()
   } finally {
     loading.value = false
   }
@@ -18,22 +18,27 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="oj-page labList">
+  <div class="oj-page dataAnalysisList">
     <h1 class="title">数据分析</h1>
     <n-spin v-if="loading" size="small" />
-    <n-empty v-else-if="!labs.length" description="还没有内容" />
+    <n-empty v-else-if="!dataAnalyses.length" description="还没有内容" />
     <div v-else class="rows">
-      <router-link v-for="lab in labs" :key="lab.id" :to="{ name: 'lab', params: { labID: lab.id } }" class="row">
-        <span class="name">{{ lab.title }}</span>
-        <n-tag v-if="!lab.isPublic" size="small" :bordered="false">没公开</n-tag>
+      <router-link
+        v-for="dataAnalysis in dataAnalyses"
+        :key="dataAnalysis.id"
+        :to="{ name: 'data analysis', params: { dataAnalysisID: dataAnalysis.id } }"
+        class="row"
+      >
+        <span class="name">{{ dataAnalysis.title }}</span>
+        <n-tag v-if="!dataAnalysis.isPublic" size="small" :bordered="false">没公开</n-tag>
         <span class="grow"></span>
         <span class="dots" aria-hidden="true">
-          <span v-for="i in lab.stepCount" :key="i" class="dot" :class="{ on: i <= lab.passedCount }"></span>
+          <span v-for="i in dataAnalysis.stepCount" :key="i" class="dot" :class="{ on: i <= dataAnalysis.passedCount }"></span>
         </span>
         <span class="count">
-          <template v-if="lab.passedCount === lab.stepCount && lab.stepCount">全做对了</template>
-          <template v-else-if="lab.passedCount">做对 {{ lab.passedCount }} / {{ lab.stepCount }} 步</template>
-          <template v-else>{{ lab.stepCount }} 步</template>
+          <template v-if="dataAnalysis.passedCount === dataAnalysis.stepCount && dataAnalysis.stepCount">全做对了</template>
+          <template v-else-if="dataAnalysis.passedCount">做对 {{ dataAnalysis.passedCount }} / {{ dataAnalysis.stepCount }} 步</template>
+          <template v-else>{{ dataAnalysis.stepCount }} 步</template>
         </span>
       </router-link>
     </div>

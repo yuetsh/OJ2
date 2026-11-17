@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { AdminLabListItem } from '@oj2/contract'
+import type { AdminDataAnalysisListItem } from '@oj2/contract'
 import { NButton, NTag } from 'naive-ui'
 import UserName from 'shared/components/UserName.vue'
 import { errorMessage } from 'utils/api'
 import { parseTime } from 'utils/functions'
 import PageHeader from '../components/PageHeader.vue'
-import { createAdminLab, deleteAdminLab, getAdminLabs, reorderAdminLabs } from '../api'
+import { createAdminDataAnalysis, deleteAdminDataAnalysis, getAdminDataAnalyses, reorderAdminDataAnalyses } from '../api'
 
 /**
  * 后台「数据分析」列表：一节一行，拖动排先后（学生列表照这个顺序）。
@@ -16,7 +16,7 @@ const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
 
-const labs = ref<AdminLabListItem[]>([])
+const dataAnalyses = ref<AdminDataAnalysisListItem[]>([])
 const loading = ref(true)
 const showCreate = ref(false)
 const newTitle = ref('')
@@ -26,31 +26,31 @@ const dragId = ref<number | null>(null)
 /** 学生那边看到的第几节：只数公开的 */
 const publicNo = computed(() => {
   const no = new Map<number, number>()
-  labs.value.filter((lab) => lab.isPublic).forEach((lab, index) => no.set(lab.id, index + 1))
+  dataAnalyses.value.filter((dataAnalysis) => dataAnalysis.isPublic).forEach((dataAnalysis, index) => no.set(dataAnalysis.id, index + 1))
   return no
 })
 
-async function drop(target: AdminLabListItem) {
+async function drop(target: AdminDataAnalysisListItem) {
   const fromId = dragId.value
   dragId.value = null
   if (fromId === null || fromId === target.id) return
-  const fromIndex = labs.value.findIndex((lab) => lab.id === fromId)
-  const targetIndex = labs.value.findIndex((lab) => lab.id === target.id)
+  const fromIndex = dataAnalyses.value.findIndex((dataAnalysis) => dataAnalysis.id === fromId)
+  const targetIndex = dataAnalyses.value.findIndex((dataAnalysis) => dataAnalysis.id === target.id)
   if (fromIndex < 0 || targetIndex < 0) return
   // 先在本地换好位置，拖完立刻看到
-  const next = [...labs.value]
+  const next = [...dataAnalyses.value]
   const [moved] = next.splice(fromIndex, 1)
   next.splice(targetIndex, 0, moved!)
-  labs.value = next
+  dataAnalyses.value = next
   try {
-    await reorderAdminLabs(next.map((lab) => lab.id))
+    await reorderAdminDataAnalyses(next.map((dataAnalysis) => dataAnalysis.id))
   } catch (err) {
     message.error(errorMessage(err))
     await load()
   }
 }
 
-function rowProps(row: AdminLabListItem) {
+function rowProps(row: AdminDataAnalysisListItem) {
   return {
     draggable: true,
     class: dragId.value === row.id ? 'dragging' : undefined,
@@ -64,7 +64,7 @@ function rowProps(row: AdminLabListItem) {
 async function load() {
   loading.value = true
   try {
-    labs.value = await getAdminLabs()
+    dataAnalyses.value = await getAdminDataAnalyses()
   } finally {
     loading.value = false
   }
@@ -75,8 +75,8 @@ async function create() {
   if (!title) return
   creating.value = true
   try {
-    const lab = await createAdminLab(title)
-    router.push({ name: 'admin lab edit', params: { labID: lab.id } })
+    const dataAnalysis = await createAdminDataAnalysis(title)
+    router.push({ name: 'admin data analysis edit', params: { dataAnalysisID: dataAnalysis.id } })
   } catch (err) {
     message.error(errorMessage(err))
   } finally {
@@ -84,16 +84,16 @@ async function create() {
   }
 }
 
-function remove(lab: AdminLabListItem) {
+function remove(dataAnalysis: AdminDataAnalysisListItem) {
   dialog.warning({
-    title: `删掉「${lab.title}」？`,
-    content: lab.students ? `${lab.students} 个学生做过，他们的代码和进度会一起删掉。` : '步骤和素材会一起删掉。',
+    title: `删掉「${dataAnalysis.title}」？`,
+    content: dataAnalysis.students ? `${dataAnalysis.students} 个学生做过，他们的代码和进度会一起删掉。` : '步骤和素材会一起删掉。',
     positiveText: '删掉',
     negativeText: '算了',
     onPositiveClick: async () => {
       try {
-        await deleteAdminLab(lab.id)
-        labs.value = labs.value.filter((item) => item.id !== lab.id)
+        await deleteAdminDataAnalysis(dataAnalysis.id)
+        dataAnalyses.value = dataAnalyses.value.filter((item) => item.id !== dataAnalysis.id)
       } catch (err) {
         message.error(errorMessage(err))
       }
@@ -101,7 +101,7 @@ function remove(lab: AdminLabListItem) {
   })
 }
 
-const columns: DataTableColumn<AdminLabListItem>[] = [
+const columns: DataTableColumn<AdminDataAnalysisListItem>[] = [
   {
     title: '',
     key: 'drag',
@@ -136,8 +136,8 @@ const columns: DataTableColumn<AdminLabListItem>[] = [
     width: 230,
     render: (row) =>
       h('div', { style: 'display: flex; gap: 8px' }, [
-        h(NButton, { size: 'small', onClick: () => router.push({ name: 'admin lab edit', params: { labID: row.id } }) }, () => '编辑'),
-        h(NButton, { size: 'small', onClick: () => router.push({ name: 'lab progress', params: { labID: row.id } }) }, () => '全班进度'),
+        h(NButton, { size: 'small', onClick: () => router.push({ name: 'admin data analysis edit', params: { dataAnalysisID: row.id } }) }, () => '编辑'),
+        h(NButton, { size: 'small', onClick: () => router.push({ name: 'data analysis progress', params: { dataAnalysisID: row.id } }) }, () => '全班进度'),
         h(NButton, { size: 'small', type: 'error', ghost: true, onClick: () => remove(row) }, () => '删除'),
       ]),
   },
@@ -153,7 +153,7 @@ onMounted(load)
     </template>
   </PageHeader>
 
-  <n-data-table :columns="columns" :data="labs" :loading="loading" :row-key="(row: AdminLabListItem) => row.id" :row-props="rowProps" />
+  <n-data-table :columns="columns" :data="dataAnalyses" :loading="loading" :row-key="(row: AdminDataAnalysisListItem) => row.id" :row-props="rowProps" />
 
   <n-modal v-model:show="showCreate" preset="card" title="新建一节" style="width: 440px" :bordered="false">
     <n-input v-model:value="newTitle" placeholder="标题，比如：用 pandas 分析班级成绩" maxlength="128" @keyup.enter="create" />
