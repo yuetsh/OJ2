@@ -141,6 +141,19 @@ labelingRoutes.get('/labelings/:id', optionalAuth, async (c) => {
   } satisfies LabelingDetail)
 })
 
+/**
+ * 只能往前（设计文档第 8 节）：学生只能碰已经标对的和「下一条」（第一条还没标对的），后面的交不了、图也看不了。
+ * 原来只靠页面不给按钮，条目 id 是自增的，猜着发请求就能跳着做。老师不拦（出题页、全班情况都要看所有的图）。
+ * 没登录的人看公开的一节只看得到第一条（和一节页面给的 current 一致）。
+ */
+async function reachable(c: Context<AppEnv>, labelingId: number, itemId: number) {
+  if (isTeacher(c)) return true
+  const [items, answers] = await Promise.all([selectItems([labelingId]), myAnswers(c.get('user')?.id, [labelingId])])
+  const passed = new Set(answers.filter((a) => a.passedAt).map((a) => a.itemId))
+  if (passed.has(itemId)) return true
+  return items.find((item) => !passed.has(item.id))?.id === itemId
+}
+
 /** 找到这一节里的这一条 */
 async function findItem(c: Context<AppEnv>) {
   const labeling = await findLabeling(c)
@@ -155,11 +168,12 @@ async function findItem(c: Context<AppEnv>) {
 
 /**
  * 交一条。第一次交的内容记下来（统计用），之后只累计错的次数；标对了记时间，之后再交都按对处理。
- * 只能往前（标对一条才出下一条）是页面的事，这里不拦 —— 跳着交也只是给自己记了一条作答。
+ * 只能往前：前面还有没标对的就不收（见 reachable）。
  */
 labelingRoutes.post('/labelings/:id/items/:itemId/answer', requireAuth, async (c) => {
   const found = await findItem(c)
   if (!found) return failure(c, 404, 'labeling-item-not-found', '这一条不存在')
+  if (!(await reachable(c, found.labeling.id, found.item.id))) return failure(c, 409, 'not-current-item', '先把前面的标完，刷新一下')
   const parsed = await parseBody(c, answerLabelingRequestSchema)
   if (!parsed.success) return parsed.response
   const { labeling, item } = found
@@ -234,6 +248,9 @@ labelingRoutes.get('/labelings/:id/items/:itemId/image', optionalAuth, async (c)
     .where(and(eq(schema.labelingItem.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })), eq(schema.labelingItem.labelingId, labeling.id)))
     .limit(1)
   if (!row?.image || !row.imageType) return failure(c, 404, 'image-not-found', '这张图不存在')
+  if (!(await reachable(c, labeling.id, queryInteger(c.req.param('itemId'), 0, { min: 1 })))) {
+    return failure(c, 404, 'image-not-found', '这张图不存在') // 还没轮到的不给看，也不说有没有
+  }
   return new Response(new Uint8Array(row.image), {
     headers: { 'content-type': row.imageType, 'cache-control': 'private, max-age=86400' },
   })

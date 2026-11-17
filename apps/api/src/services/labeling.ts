@@ -133,6 +133,47 @@ export function judge(
 }
 
 /** 图片按文件头认的扩展名 → content-type */
+/**
+ * 从文件头读出图片的宽高（PNG / JPG / GIF / BMP，和 IMAGE_TYPES 同一批），读不出来回 null。
+ * 出题页上传前在浏览器里缩到长边 1280，服务器原来只查 2MB：绕过页面直接调接口能塞进一张 4000px 的图，
+ * 学生多在手机上看，一节十几张。只读头上几个字节，不解码。
+ */
+export function imageSize(buf: Uint8Array, extension: string): { width: number; height: number } | null {
+  const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength)
+  try {
+    if (extension === '.png') return { width: view.getUint32(16), height: view.getUint32(20) }
+    if (extension === '.gif') return { width: view.getUint16(6, true), height: view.getUint16(8, true) }
+    if (extension === '.bmp') {
+      // 老的 BITMAPCOREHEADER（头长 12）宽高是 16 位，其余都是 32 位、高度可能为负（自上而下存）
+      if (view.getUint32(14, true) === 12) return { width: view.getUint16(18, true), height: view.getUint16(20, true) }
+      return { width: Math.abs(view.getInt32(18, true)), height: Math.abs(view.getInt32(22, true)) }
+    }
+    if (extension === '.jpg') {
+      // 一段一段往后跳，找到 SOFn（帧头）读宽高；C4 / C8 / CC 不是帧头
+      let pos = 2
+      while (pos + 9 < buf.length) {
+        if (buf[pos] !== 0xff) return null
+        const marker = buf[pos + 1]!
+        if (marker === 0xff) {
+          pos += 1 // 填充字节
+          continue
+        }
+        if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+          return { width: view.getUint16(pos + 7), height: view.getUint16(pos + 5) }
+        }
+        if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+          pos += 2 // 没有长度的独立标记
+          continue
+        }
+        pos += 2 + view.getUint16(pos + 2)
+      }
+    }
+  } catch {
+    // 文件太短、读越界
+  }
+  return null
+}
+
 export const IMAGE_TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',

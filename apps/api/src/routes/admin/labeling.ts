@@ -6,6 +6,7 @@
  */
 import {
   LABELING_IMAGE_MAX_BYTES,
+  LABELING_IMAGE_MAX_SIDE,
   LABELING_MAX_ITEMS,
   STUDENT_ROLES,
   createLabelingRequestSchema,
@@ -22,7 +23,7 @@ import { requireTeacher, type AppEnv } from '../../auth/middleware'
 import { db, schema } from '../../db'
 import { failure, parseBody, success } from '../../http'
 import { sniffImageExtension } from '../../services/image'
-import { IMAGE_TYPES, itemColumns, labelingSaveError, type ItemRow } from '../../services/labeling'
+import { IMAGE_TYPES, imageSize, itemColumns, labelingSaveError, type ItemRow } from '../../services/labeling'
 import { queryInteger, sampleUser } from '../helpers'
 
 export const adminLabelingRoutes = new Hono<AppEnv>()
@@ -238,6 +239,11 @@ adminLabelingRoutes.post('/labelings/:id/images', requireTeacher, async (c) => {
     .where(eq(schema.labelingItem.labelingId, labelingId))
   if ((count?.n ?? 0) >= LABELING_MAX_ITEMS) return failure(c, 400, 'too-many-items', `一节最多 ${LABELING_MAX_ITEMS} 条`)
   const image = Buffer.from(await file.arrayBuffer())
+  const size = imageSize(image, extension)
+  if (!size || !size.width || !size.height) return failure(c, 400, 'invalid-image', '读不出这张图的大小，换一张试试')
+  if (Math.max(size.width, size.height) > LABELING_IMAGE_MAX_SIDE) {
+    return failure(c, 400, 'image-too-large', `图太大了（${size.width}×${size.height}），长边最多 ${LABELING_IMAGE_MAX_SIDE}`)
+  }
   const row = await db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(schema.labelingItem)
