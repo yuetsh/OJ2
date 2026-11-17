@@ -42,7 +42,7 @@
  */
 import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import { dailyPose, festivalPose, napPose, PEEK_SIZE, pick as pickOne, poseUrl, situationPose, type MascotPose } from 'shared/mascot/poses'
-import { mascotLines, type MascotSituation } from 'shared/mascot/lines'
+import { MASCOT_LINES, mascotLines, type MascotSituation } from 'shared/mascot/lines'
 import { MASCOT_OUTFIT_COSTS, MASCOT_OUTFITS, type MascotOutfit } from '@oj2/contract'
 import { chooseChat, type MascotQuestion } from 'shared/mascot/chat'
 import { currentMascotGuide, fillLine, mascotBox, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
@@ -66,6 +66,7 @@ import {
   spokenSpeechKeys,
   type MascotSpeech,
 } from 'shared/mascot/behavior'
+import { useAchievementStore } from 'shared/store/achievement'
 import { useAuthModalStore } from 'shared/store/authModal'
 import { useCollabStore } from 'shared/store/collab'
 import { useUserStore } from 'shared/store/user'
@@ -1026,6 +1027,26 @@ watch(collectReward, (n) => {
   }, 500)
   setTimeout(() => clearInterval(wait), 120_000)
 })
+
+// 拿到「小鲸鱼」那一组成就：弹窗出来时她说一句（一个就说那一个的，好几个一起来说个总的）。等法同上
+const achievementStore = useAchievementStore()
+watch(
+  () => achievementStore.batch,
+  (items) => {
+    const mine = items.filter((item) => item.metric?.startsWith('mascot_'))
+    if (!mine.length) return
+    const own = `unlock.${mine[0]!.metric!.slice('mascot_'.length)}`
+    const situation: MascotSituation = mine.length > 1 || !(own in MASCOT_LINES) ? 'unlock.many' : (own as MascotSituation)
+    const wait = setInterval(() => {
+      if (silent.value || bubble.value || dragging.value || flying.value || document.querySelector('.n-modal-mask')) return
+      clearInterval(wait)
+      const text = fillLine(pick(situation), { n: mine.length })
+      say({ text, situation, pose: situationPose(situation) }, SPOKEN_BUBBLE_MS)
+      logMascotEvent({ kind: 'speak', situation, line: text })
+    }, 300)
+    setTimeout(() => clearInterval(wait), 120_000)
+  },
+)
 
 // ---- 闲聊：没人理她，隔几分钟自己说一句 ----
 let nextChatAt = performance.now() + CHAT_FIRST_MS

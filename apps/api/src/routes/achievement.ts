@@ -6,12 +6,13 @@ import {
   type AchievementList,
   type PendingAchievement,
 } from '@oj2/contract'
-import { and, asc, count, desc, eq, inArray, isNull, max } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray, isNull, notLike, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { requireAuth, type AppEnv } from '../auth/middleware'
 import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
+import { isMascotMetric, MASCOT_METRIC_PREFIX } from '../services/mascot-achievements'
 import { currentWeekStreak } from '../services/problem-progress'
 import { asRecord } from './helpers'
 
@@ -49,6 +50,7 @@ function pendingData(row: { achievement: typeof schema.achievement.$inferSelect 
     description: row.achievement.description,
     icon: row.achievement.icon,
     rarity: row.achievement.rarity,
+    metric: row.achievement.metric,
   } satisfies PendingAchievement
 }
 
@@ -89,6 +91,7 @@ achievementRoutes.get('/achievements', requireAuth, async (c) => {
       icon: masked ? 'noto:red-question-mark' : achievement.icon,
       rarity: achievement.rarity,
       hidden: achievement.hidden,
+      mascot: isMascotMetric(achievement.metric),
       metric: masked ? null : achievement.metric,
       operator: masked ? null : achievement.operator,
       threshold: masked ? null : achievement.threshold,
@@ -131,17 +134,25 @@ async function buildClassBoard(target: { id: number; className: string | null })
       .where(and(classMembers(className), eq(schema.achievement.visible, true), eq(schema.userAchievement.backfilled, false)))
       .orderBy(desc(schema.userAchievement.unlockTime))
       .limit(CLASS_RECENT),
-    // 不计入排名的人（老师在排名里关掉的）也不进「成就最多」
+    // 不计入排名的人（老师在排名里关掉的）也不进「成就最多」；「小鲸鱼」那一组不算（玩她拿到的不比，同奖杯收藏家）
     db
       .select({
         id: schema.user.id,
         username: schema.user.username,
         count: count(schema.achievement.id),
-        last: max(schema.userAchievement.unlockTime),
+        // 只看算数的那些（上面 count 的口径）
+        last: sql<string | null>`max(${schema.userAchievement.unlockTime}) filter (where ${schema.achievement.id} is not null)`,
       })
       .from(schema.user)
       .leftJoin(schema.userAchievement, eq(schema.userAchievement.userId, schema.user.id))
-      .leftJoin(schema.achievement, and(eq(schema.achievement.id, schema.userAchievement.achievementId), eq(schema.achievement.visible, true)))
+      .leftJoin(
+        schema.achievement,
+        and(
+          eq(schema.achievement.id, schema.userAchievement.achievementId),
+          eq(schema.achievement.visible, true),
+          notLike(schema.achievement.metric, `${MASCOT_METRIC_PREFIX}%`),
+        ),
+      )
       .where(and(classMembers(className), isNull(schema.user.rankHiddenAt)))
       .groupBy(schema.user.id, schema.user.username),
   ])

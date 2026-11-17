@@ -85,6 +85,8 @@ interface AchievementNotification {
   description: string
   icon: string
   rarity: string
+  /** 成就的指标（前台拿它认出「小鲸鱼」那一组，让她说一句）；专题奖章没有 */
+  metric?: string
   kind: 'achievement' | 'badge'
 }
 

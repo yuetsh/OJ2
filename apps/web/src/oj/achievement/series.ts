@@ -7,7 +7,7 @@ import type { Achievement } from 'utils/types'
  * 指标是后台可配的，这里没登记的指标归到「其他」、拿第一档的名字当线名 —— 不会丢，只是不好看，
  * 在后台加了新指标记得回来补一行。
  */
-export const GROUPS = ['做题', '坚持', '专题和比赛', '其他', '彩蛋'] as const
+export const GROUPS = ['做题', '坚持', '专题和比赛', '其他', '彩蛋', '小鲸鱼'] as const
 export type GroupName = (typeof GROUPS)[number]
 
 interface MetricInfo {
@@ -132,6 +132,21 @@ const METRICS: Record<string, MetricInfo> = {
     unit: '行',
     remain: (r) => `还差 ${r} 行`,
   },
+  // 「小鲸鱼」：看板娘的互动做的（0047）。只有一档的隐藏成就不排成线，摆成一格格的（Group.found）
+  mascot_days: { group: '小鲸鱼', label: '来找她的天数', unit: '天', remain: (r) => `再有 ${r} 天来找她` },
+  mascot_fed: { group: '小鲸鱼', label: '喂的小鱼干', unit: '条', remain: (r) => `再喂她 ${r} 条小鱼干` },
+  mascot_daily: { group: '小鲸鱼', label: '做对每天一道', unit: '次', remain: (r) => `再做对 ${r} 次每天一道` },
+  mascot_poses: { group: '小鲸鱼', label: '见过的样子', unit: '种', remain: (r) => `再见到她 ${r} 种样子` },
+  mascot_lines: { group: '小鲸鱼', label: '听过的话', unit: '句', remain: (r) => `再听她说 ${r} 句` },
+  mascot_outfits: { group: '小鲸鱼', label: '换过的衣服', unit: '身', remain: (r) => `再给她换 ${r} 身` },
+  mascot_answers: { group: '小鲸鱼', label: '答过的问题', unit: '道', remain: (r) => `再答她 ${r} 道问题` },
+  mascot_mistakes: { group: '小鲸鱼', label: '被她指出的错', unit: '种', remain: (r) => `还差 ${r} 种` },
+  mascot_fling: { group: '小鲸鱼', label: '甩晕她', unit: '次', remain: (r) => `再甩 ${r} 次` },
+}
+
+/** 「小鲸鱼」那一组的指标（键的前缀，和后端 MASCOT_METRIC_PREFIX 一致） */
+export function isMascotMetric(metric: string | null | undefined) {
+  return !!metric?.startsWith('mascot_')
 }
 
 const METRIC_ORDER = Object.keys(METRICS)
@@ -153,6 +168,8 @@ export interface Series {
 export interface Group {
   name: GroupName
   series: Series[]
+  /** 「小鲸鱼」组里只有一档的隐藏成就（玩她玩出来的），拿到的摆成一格格，不排成线 */
+  found: Achievement[]
   /** 还没找到的隐藏成就（后端已经遮成问号，连属于哪条线都不知道） */
   masked: number
   got: number
@@ -165,12 +182,11 @@ export function infoOf(metric: string): MetricInfo | null {
 
 export function buildGroups(achievements: Achievement[]): Group[] {
   const byMetric = new Map<string, Achievement[]>()
-  let masked = 0
-  let maskedGot = 0
+  // 还没找到的隐藏成就按组数：「小鲸鱼」的问号放在它自己那一组，别的都在「彩蛋」
+  const masked = { 彩蛋: 0, 小鲸鱼: 0 }
   for (const item of achievements) {
     if (!item.metric) {
-      masked += 1
-      if (item.unlocked) maskedGot += 1
+      masked[item.mascot ? '小鲸鱼' : '彩蛋'] += 1
       continue
     }
     const list = byMetric.get(item.metric) ?? []
@@ -184,7 +200,8 @@ export function buildGroups(achievements: Achievement[]): Group[] {
       const info = METRICS[metric]
       return {
         metric,
-        group: info?.group ?? '其他',
+        // 「小鲸鱼」那几个一档的隐藏成就没登记，按前缀认
+        group: info?.group ?? (isMascotMetric(metric) ? '小鲸鱼' : '其他'),
         label: info?.label ?? items[0]!.name,
         unit: info?.unit ?? '',
         streak: info?.streak ?? false,
@@ -195,13 +212,16 @@ export function buildGroups(achievements: Achievement[]): Group[] {
     })
   return GROUPS.map((name) => {
     const own = series.filter((item) => item.group === name)
-    const extra = name === '彩蛋' ? masked : 0
+    const single = (item: Series) => name === '小鲸鱼' && item.items.length === 1 && item.items[0]!.hidden
+    const extra = name === '彩蛋' || name === '小鲸鱼' ? masked[name] : 0
     const items = own.flatMap((item) => item.items)
     return {
       name,
-      series: own,
+      series: own.filter((item) => !single(item)),
+      found: own.filter(single).map((item) => item.items[0]!),
       masked: extra,
-      got: items.filter((item) => item.unlocked).length + (name === '彩蛋' ? maskedGot : 0),
+      // 问号都是还没拿到的（拿到了就亮出来了）
+      got: items.filter((item) => item.unlocked).length,
       total: items.length + extra,
     }
   })
@@ -225,6 +245,8 @@ export interface Near {
 export function nearest(groups: Group[], limit = 3): Near[] {
   const candidates: Near[] = []
   for (const group of groups) {
+    // 「快拿到了」只提做题这边的，玩她的不提
+    if (group.name === '小鲸鱼') continue
     for (const series of group.series) {
       const next = series.next
       if (!next || next.operator !== 'gte' || !next.threshold) continue

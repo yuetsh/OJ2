@@ -582,6 +582,7 @@ export async function judgeSubmission(job: JudgeJobData) {
           description: achievement.description,
           icon: achievement.icon,
           rarity: achievement.rarity,
+          metric: achievement.metric,
           kind: 'achievement',
         })),
       )

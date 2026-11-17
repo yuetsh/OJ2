@@ -21,6 +21,7 @@ import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
 import { isTeacherOrAbove } from './helpers'
 import { JudgeStatus } from '../judge/status'
+import { scheduleMascotSettle } from '../services/mascot-achievements'
 import { calendarDay, dayNumber, dayStart, localDateTime, localTime, weekStart } from '../time'
 
 export const mascotRoutes = new Hono<AppEnv>()
@@ -57,9 +58,13 @@ mascotRoutes.post('/mascot/events', requireAuth, async (c) => {
     // 每天挑的题只有后端记（dailyOf），前台发来的不收：它决定多给几条小鱼干
     if (kind === 'daily') return success(c, null)
     await db.insert(schema.mascotEvent).values({ userId: user.id, kind, situation, line, action, path })
+    // 「小鲸鱼」那一组成就按这些记录数，跑例子、举手、按按钮、挪地方跟它们无关
+    if (!SETTLE_SKIP.has(kind)) scheduleMascotSettle(user.id)
   }
   return success(c, null)
 })
+
+const SETTLE_SKIP = new Set<MascotEventKind>(['trial', 'help', 'action', 'move'])
 
 async function canDress(userId: number, outfit: string | undefined) {
   if (outfit === MASCOT_OUTFIT_NONE) return true

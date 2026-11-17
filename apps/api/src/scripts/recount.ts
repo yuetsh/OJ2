@@ -4,6 +4,7 @@ import { db, schema } from '../db'
 import { JudgeStatus, isAccepted } from '../judge/status'
 import { asRecord } from '../routes/helpers'
 import { metaAchievements, refreshUnlockedCount, rescanAchievement } from '../services/achievements'
+import { MASCOT_METRIC_PREFIX } from '../services/mascot-achievements'
 
 /**
  * 把反范式的计数列重算回与 submission 表一致。
@@ -192,7 +193,7 @@ async function unlockedCountPlan(plan: Plan) {
         select ua.user_id, count(*)::int as value
         from user_achievement ua
         join achievement a on a.id = ua.achievement_id
-        where a.rarity <> 'platinum'
+        where a.rarity <> 'platinum' and a.visible and a.metric not like ${MASCOT_METRIC_PREFIX + '%'}
         group by ua.user_id
       ) c on c.user_id = s.user_id
     `),

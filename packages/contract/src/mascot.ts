@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { TIME_ZONE_OFFSET_MINUTES } from './time'
 
 /**
  * 看板娘的互动记录（POST /mascot/events）。前台每次互动发一条，落进 `mascot_event`：
@@ -255,3 +256,42 @@ export const mascotVisitSchema = z.object({
   mistakes: mascotMistakesSchema.nullable(),
 })
 export type MascotVisit = z.infer<typeof mascotVisitSchema>
+
+/**
+ * 农历节日的公历日期（春节是正月初一，中秋是八月十五），只能查表。用完了往后补几年，
+ * 没补上的年份就是不换装、拿不到「过节啦」，不会出错
+ */
+const SPRING_FESTIVAL: Record<number, string> = { 2027: '02-06', 2028: '01-26', 2029: '02-13', 2030: '02-03' }
+const MID_AUTUMN: Record<number, string> = { 2026: '09-25', 2027: '09-15', 2028: '10-03', 2029: '09-22', 2030: '09-12' }
+const DAY_MS = 86_400_000
+
+/** 东八区的「月-日」和日序号（固定偏移，见 time.ts） */
+function wallDay(ms: number) {
+  const wall = new Date(ms + TIME_ZONE_OFFSET_MINUTES * 60_000)
+  return { year: wall.getUTCFullYear(), md: wall.toISOString().slice(5, 10), day: Math.floor(wall.getTime() / DAY_MS) }
+}
+
+/** 离某个农历节日的当天差几天（在它前面是负数），这一年没查到就是 null */
+function offsetFrom(table: Record<number, string>, ms: number) {
+  const { year, day } = wallDay(ms)
+  const md = table[year]
+  if (!md) return null
+  return day - Math.floor(Date.parse(`${year}-${md}T00:00:00Z`) / DAY_MS)
+}
+
+/**
+ * 这一刻是哪个节日（她平时那张换成节日装、给她穿上那天的节日装算「过节啦」），不是节日是 null。
+ * 春节是除夕到元宵（放寒假了，回来做题的才看得到），中秋是前一天和当天（放假前最后一天在学校），别的就是那一天
+ */
+export function mascotFestival(ms = Date.now()): MascotFestivalOutfit | null {
+  const { md } = wallDay(ms)
+  if (md === '02-14') return 'festival-valentine'
+  if (md === '10-31') return 'festival-halloween'
+  if (md === '12-24' || md === '12-25') return 'festival-christmas'
+  const spring = offsetFrom(SPRING_FESTIVAL, ms)
+  if (spring !== null && spring >= -1 && spring <= 14) return 'festival-spring'
+  const midAutumn = offsetFrom(MID_AUTUMN, ms)
+  if (midAutumn !== null && midAutumn >= -1 && midAutumn <= 0) return 'festival-mid-autumn'
+  return null
+}
+export type MascotFestivalOutfit = Extract<MascotOutfit, `festival-${string}`>

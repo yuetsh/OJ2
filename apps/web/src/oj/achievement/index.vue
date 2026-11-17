@@ -38,9 +38,9 @@ const got = computed(() => data.value?.achievements.filter((item) => item.unlock
 const rarities: AchievementRarity[] = ['platinum', 'gold', 'silver', 'bronze']
 const countOf = (rarity: AchievementRarity) => got.value.filter((item) => item.rarity === rarity).length
 
-// 桌面两栏：左边做题、其他、彩蛋，右边坚持、专题和比赛 —— 两边差不多高
-const LEFT: GroupName[] = ['做题', '其他', '彩蛋']
-const RIGHT: GroupName[] = ['坚持', '专题和比赛']
+// 桌面两栏：左边做题、其他、小鲸鱼，右边坚持、专题和比赛、彩蛋 —— 两边差不多高
+const LEFT: GroupName[] = ['做题', '其他', '小鲸鱼']
+const RIGHT: GroupName[] = ['坚持', '专题和比赛', '彩蛋']
 const pick = (names: GroupName[]) => groups.value.filter((group) => names.includes(group.name))
 
 async function load() {

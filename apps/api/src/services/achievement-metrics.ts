@@ -102,9 +102,32 @@ export const ACHIEVEMENT_METRICS: AchievementMetric[] = [
   {
     key: 'achievement_unlocked_count',
     name: '拿到的成就数',
-    helpText: '已解锁的成就数量（不含白金档和已下架的）',
+    helpText: '已解锁的成就数量（不含白金档、已下架的和「小鲸鱼」那一组）',
     meta: true,
   },
+  // 「小鲸鱼」那一组：从看板娘的互动记录数（services/mascot-achievements.ts），键必须以 mascot_ 开头 ——
+  // 不算进奖杯收藏家、碰她时才结算，都是认这个前缀的
+  { key: 'mascot_days', name: '小鲸鱼：来找她的天数', helpText: '有几天点过、拖过、喂过她（东八区日历日）' },
+  { key: 'mascot_fed', name: '小鲸鱼：喂的小鱼干', helpText: '一共喂了她几条小鱼干' },
+  { key: 'mascot_daily', name: '小鲸鱼：做对每天一道', helpText: '她每天挑的题，当天做对了几次' },
+  { key: 'mascot_poses', name: '小鲸鱼：见过的样子', helpText: '见过她几种样子（一共 91 种）' },
+  { key: 'mascot_lines', name: '小鲸鱼：听过的话', helpText: '她说过几句不一样的话' },
+  { key: 'mascot_outfits', name: '小鲸鱼：换过的衣服', helpText: '给她换过几身不一样的衣服' },
+  { key: 'mascot_answers', name: '小鲸鱼：答过的问题', helpText: '她闲聊时问的问题，答过几道不一样的' },
+  { key: 'mascot_mistakes', name: '小鲸鱼：被指出的错', helpText: '写代码时被她指出过几种不一样的错' },
+  { key: 'mascot_sulk', name: '小鲸鱼：惹她生闷气', helpText: '连点到她背过身去的次数' },
+  { key: 'mascot_forgive_pat', name: '小鲸鱼：摸头哄好', helpText: '她生闷气时摸头哄好的次数' },
+  { key: 'mascot_forgive_fish', name: '小鲸鱼：喂鱼哄好', helpText: '她生闷气时喂小鱼干哄好的次数' },
+  { key: 'mascot_wake', name: '小鲸鱼：点醒', helpText: '把打盹的她点醒的次数' },
+  { key: 'mascot_feed_wake', name: '小鲸鱼：喂醒', helpText: '她睡着时喂小鱼干喂醒的次数' },
+  { key: 'mascot_peek_found', name: '小鲸鱼：捉迷藏', helpText: '她缩在屏幕边上时被找到的次数' },
+  { key: 'mascot_fling', name: '小鲸鱼：甩晕', helpText: '把她甩出去撞晕的次数' },
+  { key: 'mascot_shake', name: '小鲸鱼：摇晕', helpText: '拎着她摇晕的次数' },
+  { key: 'mascot_tickle', name: '小鲸鱼：挠痒', helpText: '用鼠标给她挠痒的次数' },
+  { key: 'mascot_tail', name: '小鲸鱼：揪尾巴', helpText: '揪过她尾巴就是 1' },
+  { key: 'mascot_full', name: '小鲸鱼：喂撑', helpText: '喂到她说吃饱了的次数' },
+  { key: 'mascot_overclick', name: '小鲸鱼：被嫌烦', helpText: '连点到她嫌烦的次数' },
+  { key: 'mascot_festival', name: '小鲸鱼：过节换装', helpText: '节日当天给她穿上那天的节日装的次数' },
 ]
 
 const BY_KEY = new Map(ACHIEVEMENT_METRICS.map((item) => [item.key, item]))

@@ -1,5 +1,6 @@
 import { MASCOT_FISH_GIFT, MASCOT_OUTFIT_COSTS, MASCOT_OUTFIT_NONE, type MascotEventInput, type MascotOutfit, type MascotProfile } from '@oj2/contract'
 import api from 'utils/api'
+import { useAchievementStore } from 'shared/store/achievement'
 import { useUserStore } from 'shared/store/user'
 import type { MascotGuide } from './guide'
 import type { MascotSituation } from './lines'
@@ -18,10 +19,26 @@ export function logMascotEvent(event: Omit<MascotEventInput, 'path'>): Promise<v
   if (!useUserStore().isAuthed) return Promise.resolve()
   const body: MascotEventInput = { ...event, path: location.pathname.slice(0, 200) }
   if (body.line) body.line = body.line.slice(0, 100)
+  if (!NO_ACHIEVEMENT.has(event.kind)) checkAchievementsSoon()
   return api.post('mascot/events', body).then(
     () => {},
     () => {},
   )
+}
+
+/** 这几种记录跟「小鲸鱼」成就无关（后端也不为它们结算，见 routes/mascot.ts 的 SETTLE_SKIP） */
+const NO_ACHIEVEMENT = new Set<MascotEventInput['kind']>(['trial', 'help', 'action', 'move'])
+/** 后端几秒内合成一次结算（SETTLE_DELAY_MS 3 秒），等它算完再拉 */
+const CHECK_AFTER_MS = 4500
+let checkTimer: ReturnType<typeof setTimeout> | undefined
+
+/**
+ * 玩她拿到成就要当场弹：推送只在题目页连着，别的页要等换页才拉，所以碰完她过几秒自己拉一次。
+ * 一直在碰就一直往后推，停手了才拉
+ */
+function checkAchievementsSoon() {
+  clearTimeout(checkTimer)
+  checkTimer = setTimeout(() => void useAchievementStore().fetchPending(), CHECK_AFTER_MS)
 }
 
 export const mascotProfile = shallowRef<MascotProfile | null>(null)

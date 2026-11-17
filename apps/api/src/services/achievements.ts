@@ -6,6 +6,7 @@ import { calendarDay, dayNumber, localHour, localTime, weekStart } from '../time
 import { findMetric } from './achievement-metrics'
 import { isAccepted, JudgeStatus } from '../judge/status'
 import { asRecord } from '../routes/helpers'
+import { isMascotMetric, MASCOT_METRIC_PREFIX, refreshMascotMetricsForAll, settleMascotAchievements } from './mascot-achievements'
 
 function numberMetric(metrics: Record<string, unknown>, key: string) {
   const value = metrics[key]
@@ -30,7 +31,7 @@ function nextWeekStreak(value: Record<string, unknown>, week: string) {
   }
 }
 
-async function unlockAchievements(userId: number, metrics: Record<string, unknown>, onlyMeta = false) {
+export async function unlockAchievements(userId: number, metrics: Record<string, unknown>, onlyMeta = false) {
   const unlocked = await db.select({ id: schema.userAchievement.achievementId }).from(schema.userAchievement).where(eq(schema.userAchievement.userId, userId))
   const filters = [eq(schema.achievement.visible, true)]
   if (unlocked.length)
@@ -77,6 +78,16 @@ async function unlockAchievements(userId: number, metrics: Record<string, unknow
     .where(inArray(schema.achievement.id, [...insertedIds]))
   return hits.filter((achievement) => insertedIds.has(achievement.id))
 }
+
+/**
+ * 算进「已解锁几个」（奖杯收藏家）的成就：上架的、非白金的、不是「小鲸鱼」那一组的（玩她拿到的不算，见 mascot-achievements.ts）。
+ * refreshUnlockedCount 里的 SQL 是同一个口径，改这里记得改那里
+ */
+const countsTowardCollector = and(
+  ne(schema.achievement.rarity, 'platinum'),
+  eq(schema.achievement.visible, true),
+  sql`${schema.achievement.metric} not like ${MASCOT_METRIC_PREFIX + '%'}`,
+)
 
 const ACCEPTED_RESULTS = sql.join([sql`${JudgeStatus.ACCEPTED}`, sql`${JudgeStatus.AST_CHECK_FAILED}`], sql`, `)
 
@@ -223,17 +234,19 @@ export async function updateAchievementsForSubmission(submissionId: string, coun
     return value
   })
 
+  // 「她点的菜」（她每天挑的题当天做对）要看提交，做对了顺手把「小鲸鱼」那一组也结算一下
+  const mascot = accepted ? await settleMascotAchievements(row.submission.userId) : []
   const first = await unlockAchievements(row.submission.userId, metrics)
-  if (!first.length) return []
+  if (!first.length) return mascot
   const [meta] = await db
     .select({ value: count() })
     .from(schema.userAchievement)
     .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(and(eq(schema.userAchievement.userId, row.submission.userId), ne(schema.achievement.rarity, 'platinum'), eq(schema.achievement.visible, true)))
+    .where(and(eq(schema.userAchievement.userId, row.submission.userId), countsTowardCollector))
   const unlockedCount = meta?.value ?? 0
   metrics.achievement_unlocked_count = unlockedCount
   await setUnlockedCount(row.submission.userId, unlockedCount)
-  return [...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
+  return [...mascot, ...first, ...(await unlockAchievements(row.submission.userId, metrics, true))]
 }
 
 /**
@@ -282,7 +295,7 @@ export async function updateAchievementsForProblemSet(userId: number) {
     .select({ value: count() })
     .from(schema.userAchievement)
     .innerJoin(schema.achievement, eq(schema.userAchievement.achievementId, schema.achievement.id))
-    .where(and(eq(schema.userAchievement.userId, userId), ne(schema.achievement.rarity, 'platinum'), eq(schema.achievement.visible, true)))
+    .where(and(eq(schema.userAchievement.userId, userId), countsTowardCollector))
   const unlockedCount = meta?.value ?? 0
   metrics.achievement_unlocked_count = unlockedCount
   await setUnlockedCount(userId, unlockedCount)
@@ -315,6 +328,8 @@ export async function rescanAchievement(achievementId: number) {
   if (achievement.metric === 'contest_joined') await refreshContestJoinedForAll()
   // max_ac_week_streak 是后加的指标，判题结算只从上线那天起累计，存量用户要从提交记录补算
   if (achievement.metric === 'max_ac_week_streak') await refreshAcWeekStreakForAll()
+  // 「小鲸鱼」那一组的指标只在碰她时结算，扫之前按记录全数一遍
+  if (isMascotMetric(achievement.metric)) await refreshMascotMetricsForAll()
 
   const already = new Set(
     (
@@ -374,6 +389,7 @@ export async function rescanAchievement(achievementId: number) {
           description: achievement.description,
           icon: achievement.icon,
           rarity: achievement.rarity,
+          metric: achievement.metric,
           kind: 'achievement',
         },
       ])
@@ -382,7 +398,7 @@ export async function rescanAchievement(achievementId: number) {
     // 旧 `rescan_achievement` 就漏了这步，OJ2 原样搬过来：2026-09-07 一次补发之后
     // 269 人的计数停在旧值，其中 10 人实际够了「奖杯收藏家」却一直没发 ——
     // 判题结算只在「这次有新解锁」时才重算，被补发的人不再解锁新成就就永远不会自愈。
-    if (achievement.rarity !== 'platinum' && achievement.metric !== 'achievement_unlocked_count') {
+    if (achievement.rarity !== 'platinum' && achievement.metric !== 'achievement_unlocked_count' && !isMascotMetric(achievement.metric)) {
       await refreshUnlockedCount(unlockedUserIds)
       for (const meta of await metaAchievements()) await rescanAchievement(meta.id)
     }
@@ -423,7 +439,7 @@ export async function refreshUnlockedCount(userIds?: number[]) {
         select ua.user_id, count(*)::int as value
         from ${schema.userAchievement} ua
         join ${schema.achievement} a on a.id = ua.achievement_id
-        where a.rarity <> 'platinum' and a.visible
+        where a.rarity <> 'platinum' and a.visible and a.metric not like ${MASCOT_METRIC_PREFIX + '%'}
         group by ua.user_id
       ) c on c.user_id = s.user_id
       where true ${scope}

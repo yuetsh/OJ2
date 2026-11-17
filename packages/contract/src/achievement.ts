@@ -9,6 +9,8 @@ export const achievementSchema = z.object({
   icon: z.string(),
   rarity: achievementRaritySchema,
   hidden: z.boolean(),
+  /** 「小鲸鱼」那一组的（看板娘的互动做的）。隐藏的还没找到时 metric 是 null，前台靠它把问号放进那一组 */
+  mascot: z.boolean(),
   metric: z.string().nullable(),
   operator: z.enum(['gte', 'lte']).nullable(),
   threshold: z.number().int().nullable(),
@@ -58,6 +60,8 @@ export const pendingAchievementSchema = z.object({
   description: z.string(),
   icon: z.string(),
   rarity: achievementRaritySchema,
+  /** 成就的指标。前台拿它认出「小鲸鱼」那一组（`mascot_` 开头），解锁时让她说一句；专题奖章没有 */
+  metric: z.string().optional(),
 })
 
 /**

@@ -5,7 +5,20 @@ import { useAchievementStore } from 'shared/store/achievement'
 import { RARITY_COLOR } from 'utils/constants'
 
 const store = useAchievementStore()
-const { current, queue } = storeToRefs(store)
+const { current, queue, batch } = storeToRefs(store)
+const many = computed(() => batch.value.length > 1)
+/** 合成一个弹窗时写几个名字，多的说「等 N 个」 */
+const NAMES_SHOWN = 4
+const names = computed(() => {
+  const list = batch.value.map((item) => `「${item.name}」`)
+  return list.length > NAMES_SHOWN ? `${list.slice(0, NAMES_SHOWN).join('')}等 ${list.length} 个` : list.join('')
+})
+/** 一起弹的里面最稀有的那个定边框颜色 */
+const RANK = ['bronze', 'silver', 'gold', 'platinum'] as const
+const border = computed(() => {
+  const top = batch.value.reduce((best, item) => (RANK.indexOf(item.rarity) > RANK.indexOf(best) ? item.rarity : best), 'bronze' as (typeof RANK)[number])
+  return RARITY_COLOR[top]
+})
 const visible = ref(false)
 const toastEl = ref<HTMLElement>()
 
@@ -31,16 +44,19 @@ const placement = computed(() => {
 let timer: ReturnType<typeof setTimeout> | null = null
 let gapTimer: ReturnType<typeof setTimeout> | null = null
 
-// 多个同时解锁时排队依次弹出，不重叠堆积
+// 多个同时解锁时排队依次弹出，不重叠堆积；排着的多了一次弹完（store.next）
 function playNext() {
-  const item = store.next()
-  if (!item) return
+  const items = store.next()
+  if (!items.length) return
   visible.value = true
-  timer = setTimeout(async () => {
-    visible.value = false
-    await store.markRead(item)
-    gapTimer = setTimeout(playNext, 400)
-  }, 3000)
+  timer = setTimeout(
+    async () => {
+      visible.value = false
+      await store.markRead(items)
+      gapTimer = setTimeout(playNext, 400)
+    },
+    items.length > 1 ? 5000 : 3000,
+  )
 }
 
 watch(
@@ -58,7 +74,16 @@ onUnmounted(() => {
 
 <template>
   <Transition name="slide">
-    <div v-if="visible && current" ref="toastEl" class="toast" :style="{ borderColor: RARITY_COLOR[current.rarity], ...placement }">
+    <div v-if="visible && current && many" ref="toastEl" class="toast many" :style="{ borderColor: border, ...placement }">
+      <div class="body">
+        <div class="label">成就解锁 ×{{ batch.length }}</div>
+        <div class="icons">
+          <AchievementIcon v-for="item in batch.slice(0, 6)" :key="`${item.kind}:${item.id}`" :icon="item.icon" :size="26" />
+        </div>
+        <div class="desc">{{ names }}</div>
+      </div>
+    </div>
+    <div v-else-if="visible && current" ref="toastEl" class="toast" :style="{ borderColor: RARITY_COLOR[current.rarity], ...placement }">
       <div class="icon">
         <AchievementIcon :icon="current.icon" :size="34" />
       </div>
@@ -92,6 +117,15 @@ onUnmounted(() => {
 }
 .icon {
   font-size: 34px;
+}
+.icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.toast.many {
+  max-width: 340px;
 }
 .label {
   font-size: 11px;

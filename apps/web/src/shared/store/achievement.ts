@@ -14,6 +14,8 @@ import type { QueuedAchievement } from 'utils/types'
 export const useAchievementStore = defineStore('achievement', () => {
   const queue = ref<QueuedAchievement[]>([])
   const current = ref<QueuedAchievement | null>(null)
+  /** 正在弹的这一批：排着的多了就一次弹完（补发一来就是十几个），一个一个弹要等一分钟 */
+  const batch = ref<QueuedAchievement[]>([])
 
   // 成就和专题奖章的 id 来自两张不同的表，数值会重叠，
   // 只按 id 去重会让奖章 5 把成就 5 挤掉
@@ -37,21 +39,26 @@ export const useAchievementStore = defineStore('achievement', () => {
     }
   }
 
+  /** 排着的超过这么多就合成一个弹窗 */
+  const MERGE_AT = 3
+
   function next() {
-    current.value = queue.value.shift() ?? null
-    return current.value
+    batch.value = queue.value.length >= MERGE_AT ? queue.value.splice(0) : queue.value.splice(0, 1)
+    current.value = batch.value[0] ?? null
+    return batch.value
   }
 
-  async function markRead(item: QueuedAchievement) {
+  async function markRead(items: QueuedAchievement[]) {
     // 奖章不在 UserAchievement 表里，它的 id 传给标记接口会被当成成就 id，
     // 把一个恰好同号、还没弹过的成就静默标记为已弹——那个奖杯就再也不会出现
-    if (item.kind === 'badge') return
+    const ids = items.filter((item) => item.kind !== 'badge').map((item) => item.id)
+    if (!ids.length) return
     try {
-      await markAchievementsRead([item.id])
+      await markAchievementsRead(ids)
     } catch {
       // 标记失败下次会重复弹一次，可接受
     }
   }
 
-  return { queue, current, enqueue, fetchPending, next, markRead }
+  return { queue, current, batch, enqueue, fetchPending, next, markRead }
 })

@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import { useThemeVars } from 'naive-ui'
 import AchievementIcon from 'shared/components/AchievementIcon.vue'
-import type { UserBadge } from 'utils/types'
+import { RARITY_LABEL } from 'utils/constants'
+import { parseTime } from 'utils/functions'
+import type { Achievement, UserBadge } from 'utils/types'
 import type { Group } from '../series'
 import Medal from './Medal.vue'
 import SeriesRow from './SeriesRow.vue'
 
-/** 一组成就线（做题 / 坚持 / …），「彩蛋」组末尾是还没找到的问号，「专题和比赛」组末尾是拿到的专题奖章 */
+/**
+ * 一组成就线（做题 / 坚持 / …），「彩蛋」组末尾是还没找到的问号，「专题和比赛」组末尾是拿到的专题奖章。
+ * 「小鲸鱼」组末尾是玩她玩出来的那些（一档的隐藏成就）：拿到的一格格带名字，后面跟着问号
+ */
 const props = defineProps<{ group: Group; badges?: UserBadge[]; compact?: boolean }>()
 
 const theme = useThemeVars()
 const showBadges = computed(() => props.group.name === '专题和比赛' && !!props.badges?.length)
+const mascot = computed(() => props.group.name === '小鲸鱼')
+
+function when(item: Achievement) {
+  // 补发的不写日期：一次补发会给几百人盖上同一个时间戳
+  return item.backfilled || !item.unlockTime ? '已拿到' : `${parseTime(item.unlockTime, 'M月D日')}拿到`
+}
 </script>
 
 <template>
@@ -20,7 +31,27 @@ const showBadges = computed(() => props.group.name === '专题和比赛' && !!pr
       <small>{{ group.got }} / {{ group.total }}</small>
     </h3>
     <SeriesRow v-for="item in group.series" :key="item.metric" :series="item" :compact="compact" />
-    <div v-if="group.masked" class="masked">
+    <div v-if="mascot && (group.found.length || group.masked)" class="masked">
+      <span class="masked-title">
+        玩出来的
+        <template v-if="group.masked">· 还有 {{ group.masked }} 个没找到</template>
+      </span>
+      <div class="masked-list">
+        <n-tooltip v-for="item in group.found" :key="item.id" :delay="150">
+          <template #trigger>
+            <span class="found">
+              <Medal :icon="item.icon" :rarity="item.rarity" :size="compact ? 30 : 34" />
+              <span>{{ item.name }}</span>
+            </span>
+          </template>
+          <b>{{ item.name }}</b> · {{ RARITY_LABEL[item.rarity] }}<br />
+          {{ item.description }}<br />
+          {{ when(item) }} · 全站 {{ item.holders }} 人有
+        </n-tooltip>
+        <Medal v-for="i in group.masked" :key="`q${i}`" state="unknown" :size="compact ? 30 : 34" />
+      </div>
+    </div>
+    <div v-else-if="group.masked" class="masked">
       <span class="masked-title">还有 {{ group.masked }} 个没找到</span>
       <div class="masked-list">
         <Medal v-for="i in group.masked" :key="i" state="unknown" :size="compact ? 30 : 34" />
@@ -84,6 +115,17 @@ h3 small {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.found {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 10px;
+  border-radius: 999px;
+  font-size: var(--oj-fs-sec);
+  white-space: nowrap;
+  background: v-bind('theme.actionColor');
 }
 
 /* 奖章名最长 9 个字（「有趣和无趣的观察者」），竖排在格子里放不下，横排写全 */

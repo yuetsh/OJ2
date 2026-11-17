@@ -1,4 +1,4 @@
-import { TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
+import { mascotFestival, TIME_ZONE_OFFSET_MINUTES } from '@oj2/contract'
 import type { MascotSituation } from './lines'
 
 /**
@@ -275,6 +275,29 @@ const SITUATION_POSE: Partial<Record<MascotSituation, readonly MascotPose[]>> = 
   'feed.wake': ['stretch'],
   'problem.acceptedFish': ['happy', 'cheer', 'excited'],
   'collect.reward': ['happy', 'wink', 'star'],
+  // 拿到「小鲸鱼」那一组成就
+  'unlock.days': ['greet', 'wave'],
+  'unlock.fed': ['eat', 'snack'],
+  'unlock.daily': ['thumbs', 'cooking'],
+  'unlock.poses': ['star', 'wink'],
+  'unlock.lines': ['wink', 'giggle'],
+  'unlock.outfits': ['smug', 'cool'],
+  'unlock.answers': ['happy'],
+  'unlock.mistakes': ['smirk', 'teasing'],
+  'unlock.sulk': ['fuming', 'angry'],
+  'unlock.forgive_pat': ['blush'],
+  'unlock.forgive_fish': ['touched', 'blush'],
+  'unlock.wake': ['sleepy', 'stretch'],
+  'unlock.feed_wake': ['stretch', 'eat'],
+  'unlock.peek_found': ['sneak'],
+  'unlock.fling': ['dizzy'],
+  'unlock.shake': ['dizzy'],
+  'unlock.tickle': ['giggle'],
+  'unlock.tail': ['angry', 'fuming'],
+  'unlock.full': ['melt'],
+  'unlock.overclick': ['unimpressed', 'doubt'],
+  'unlock.festival': ['party'],
+  'unlock.many': ['achievement', 'trophy'],
   'daily.offer': ['idea', 'wink'],
   'daily.solved': ['happy', 'thumbs'],
   'memory.streak': ['blush', 'wink'],
@@ -331,40 +354,7 @@ export function napPose(): MascotPose {
   return pick(['nap-desk', 'nap-laptop', 'sleepy'] as const)
 }
 
-/**
- * 农历节日的公历日期（春节是正月初一，中秋是八月十五），只能查表。用完了往后补几年，
- * 没补上的年份就是不换装，不会出错
- */
-const SPRING: Record<number, string> = { 2027: '02-06', 2028: '01-26', 2029: '02-13', 2030: '02-03' }
-const MID_AUTUMN: Record<number, string> = { 2026: '09-25', 2027: '09-15', 2028: '10-03', 2029: '09-22', 2030: '09-12' }
-const DAY_MS = 86_400_000
-
-/** 东八区的「月-日」和日序号 */
-function wallDay(ms: number) {
-  const wall = new Date(ms + TIME_ZONE_OFFSET_MINUTES * 60_000)
-  return { year: wall.getUTCFullYear(), md: wall.toISOString().slice(5, 10), day: Math.floor(wall.getTime() / DAY_MS) }
-}
-
-/** 离某个农历节日的当天差几天（今天在它前面是负数），这一年没查到就是 null */
-function offsetFrom(table: Record<number, string>, now: number) {
-  const { year, day } = wallDay(now)
-  const md = table[year]
-  if (!md) return null
-  return day - Math.floor(Date.parse(`${year}-${md}T00:00:00Z`) / DAY_MS)
-}
-
-/**
- * 节日当天平时那张换成节日装。春节是除夕到元宵（放寒假了，回来做题的才看得到），
- * 中秋是前一天和当天（放假前最后一天在学校），别的就是那一天
- */
+/** 节日当天平时那张换成节日装（哪天是什么节日见契约 mascotFestival） */
 export function festivalPose(now = Date.now()): MascotPose | null {
-  const { md } = wallDay(now)
-  if (md === '02-14') return 'festival-valentine'
-  if (md === '10-31') return 'festival-halloween'
-  if (md === '12-24' || md === '12-25') return 'festival-christmas'
-  const spring = offsetFrom(SPRING, now)
-  if (spring !== null && spring >= -1 && spring <= 14) return 'festival-spring'
-  const midAutumn = offsetFrom(MID_AUTUMN, now)
-  if (midAutumn !== null && midAutumn >= -1 && midAutumn <= 0) return 'festival-mid-autumn'
-  return null
+  return mascotFestival(now)
 }
