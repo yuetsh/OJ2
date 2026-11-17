@@ -95,8 +95,11 @@ services:
   data-analysis:
     logging: *logging
     # 「数据分析」的运行器（docker/data-analysis/）。和 judge 一样是本机构建的镜像：docker/data-analysis/build.sh
-    image: oj2-data-analysis-1
+    image: oj2-data-analysis-2
     container_name: oj2-data-analysis
+    # 母进程不当 PID 1：学生代码 fork 出去又被收掉的进程会过继给 PID 1，runner 不替它们收尸，僵尸攒多了占 pids_limit。
+    # init: true 让 docker 自带的 tini 当 PID 1 收尸（2026-11-17 审查补的）
+    init: true
     restart: unless-stopped
     # 不联网：api 走下面那个目录里的 unix socket 连它。学生代码因此碰不到库、redis、api
     network_mode: none

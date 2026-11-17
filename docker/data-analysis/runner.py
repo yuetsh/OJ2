@@ -15,7 +15,9 @@
 """
 
 import base64
+import gc
 import http.server
+import inspect
 import json
 import os
 import re
@@ -24,6 +26,7 @@ import select
 import shutil
 import signal
 import socketserver
+import stat
 import sys
 import tempfile
 import time
@@ -40,6 +43,9 @@ import kernel  # noqa: E402
 import compare  # noqa: E402
 
 kernel.warm_up()
+# 预热出来的几十万个对象挪进永久代：之后 fork 出来的进程跑 gc 不再逐个扫它们（forget_callers 里那次 gc.collect
+# 从 40ms 降到 0.3ms），也不会因为扫它们去写页面、把母进程的内存一页页复制一份
+gc.freeze()
 WARM_SECONDS = time.monotonic() - _t0
 
 SOCKET = os.environ.get('DATA_ANALYSIS_SOCKET', '/run/data-analysis/data-analysis.sock')
@@ -83,6 +89,31 @@ class BadRequest(Exception):
 # ---------------------------------------------------------------- 学生进程
 
 
+def uid_for(pid):
+    """学生进程用哪个 uid：每次运行一个，处理进程按 pid 就能算出来，事后好按 uid 收拾。"""
+    return 20000 + pid % 40000
+
+
+def forget_callers(frame):
+    """把 fork 前处理进程栈上的局部变量全清掉。
+
+    学生代码能顺着 sys._getframe().f_back 往上翻到 handle_run，读出整份参考答案（reference）、
+    原始请求体（body），读到了就能抄答案（审查时实测过）。学生进程从这里往后再也不回到那些栈帧
+    （跑完 os._exit），清掉没有副作用。Python 3.13 起函数栈帧的 f_locals 可以直接写（PEP 667）；
+    模块级的栈帧 f_locals 就是 globals，不能清，只清函数的（CO_OPTIMIZED）。
+
+    挡的是「翻栈帧、gc.get_objects 这类 Python 层面找得到的」；用 ctypes 去扫原始内存仍可能扫到
+    已释放的字节，那要换成 exec 新进程才挡得住，代价是每次运行多 0.7 秒 import —— 不值得。
+    """
+    while frame is not None:
+        if frame.f_code.co_flags & inspect.CO_OPTIMIZED:
+            proxy = frame.f_locals
+            for name in list(proxy):
+                proxy[name] = None
+        frame = frame.f_back
+    gc.collect()
+
+
 def spawn(job, assets):
     """fork 一个学生进程跑 job，返回 (pid, 目录)。"""
     run_dir = tempfile.mkdtemp(dir=RUNS_DIR)
@@ -94,6 +125,8 @@ def spawn(job, assets):
         return pid, run_dir
     status = 1
     try:
+        assets = None  # 素材已经写进目录了
+        forget_callers(sys._getframe(1))
         child(job, run_dir)
         status = 0
     except BaseException:  # noqa: BLE001
@@ -106,7 +139,7 @@ def spawn(job, assets):
 
 def child(job, run_dir):
     os.setsid()  # 自成一个进程组：超时的时候连学生代码开的子进程一起杀
-    uid = 20000 + os.getpid() % 40000
+    uid = uid_for(os.getpid())
     for name in os.listdir(run_dir):
         os.chown(os.path.join(run_dir, name), uid, uid)
     os.chown(run_dir, uid, uid)
@@ -173,24 +206,95 @@ def wait_all(runs):
         except ProcessLookupError:
             pass
         _, st = os.waitpid(pid, 0)
+        uid = uid_for(pid)
+        reap_uid(uid)  # 先收干净，免得残留的进程在读结果的时候还在改目录
         result, failure = None, None
         if i in timed_out:
             failure = 'timeout'
         else:
-            path = os.path.join(run_dir, '.result.json')
             try:
-                if os.path.getsize(path) > MAX_BODY:
-                    failure = 'crashed'
-                else:
-                    with open(path, 'rb') as f:
-                        result = json.loads(f.read())
+                result = json.loads(read_result(os.path.join(run_dir, '.result.json')))
             except (OSError, ValueError):
                 failure = 'crashed'
             if failure and os.WIFSIGNALED(st) and os.WTERMSIG(st) in (signal.SIGXCPU, signal.SIGKILL):
                 failure = 'timeout'
         shutil.rmtree(run_dir, ignore_errors=True)
+        clean_uid_files(uid)
         out.append((result, failure))
     return out
+
+
+def read_result(path):
+    """读学生进程写的结果。
+
+    这个文件在学生的目录里，学生代码可以事先把它换成别的东西：换成命名管道，open() 会一直等一个永远不来的
+    写入方，处理进程就此卡死，三次就把并发名额占满、全站停摆（审查时实测过）；换成指向 /dev/zero 的链接，
+    root 会一直读到内存爆。所以不跟链接、不阻塞地打开，确认是普通文件、大小在上限内才读。
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_size > MAX_BODY:
+            raise ValueError('结果文件不对')
+        chunks, left = [], st.st_size
+        while left > 0:
+            chunk = os.read(fd, min(left, 1 << 20))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            left -= len(chunk)
+        return b''.join(chunks)
+    finally:
+        os.close(fd)
+
+
+def reap_uid(uid):
+    """杀掉这个 uid 剩下的所有进程。
+
+    超时的 killpg 只管学生进程自己那一组；学生代码 fork 出去再 setsid 就不在组里了，sleep 着不耗 CPU、
+    CPU 上限也管不到，能一直活着，攒多了把容器的 pids_limit 用完、谁都运行不了（审查时实测过）。
+    办法是 fork 一个进程换成这个 uid 再 kill(-1)：内核一次把「这个 uid 能发信号的所有进程」都杀掉，
+    中途 fork 出来的也逃不掉。uid 每次运行一个，不会误伤别人。
+    """
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.setgroups([])
+            os.setgid(uid)
+            os.setuid(uid)
+            os.kill(-1, signal.SIGKILL)
+        except ProcessLookupError:
+            pass  # 没有剩下的
+        except BaseException:  # noqa: BLE001
+            os._exit(1)
+        os._exit(0)
+    os.waitpid(pid, 0)
+
+
+# 学生进程能写的地方除了自己的目录，还有这两个（都是所有人可写的 tmpfs），写进去的东西运行完不会自己消失
+SHARED_TMP_DIRS = ('/tmp', '/dev/shm')
+
+
+def clean_uid_files(uid):
+    """删掉这个 uid 留在公共临时目录里的文件。不删的话，一个学生反复往 /tmp 写满 32MB 的文件，
+    512MB 很快占满，之后谁的素材都放不进去（审查时实测过，文件一直留着）。只看第一层：
+    别人的目录学生进不去写，自己建的目录整个删掉（rmtree 不跟链接）。"""
+    for top in SHARED_TMP_DIRS:
+        try:
+            entries = list(os.scandir(top))
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                st = entry.stat(follow_symlinks=False)
+                if st.st_uid != uid:
+                    continue
+                if stat.S_ISDIR(st.st_mode):
+                    shutil.rmtree(entry.path, ignore_errors=True)
+                else:
+                    os.unlink(entry.path)
+            except OSError:
+                pass
 
 
 def failure_error(failure, step):

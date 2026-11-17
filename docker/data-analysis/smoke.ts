@@ -51,6 +51,7 @@ async function call(path: string, body?: unknown): Promise<{ status: number; jso
     method: body === undefined ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000), // 运行器卡死时报失败，别一直挂着（老镜像碰上「管道」那项就是卡死）
   })
   return { status: res.status, json: await res.json() }
 }
@@ -221,6 +222,69 @@ await test('写不了根目录', async () => {
 await test('fork 炸弹被进程数限住', async () => {
   const r = await run({ steps: ['import os\nwhile True:\n    os.fork()'] })
   return r.error ? null : 'fork 炸弹居然没报错'
+})
+// 下面四项是 2026-11-17 审查时实测打穿过的（oj2-data-analysis-1），修在 runner.py 的 read_result / reap_uid / clean_uid_files / forget_callers
+await test('结果文件换成管道也卡不死运行器', async () => {
+  for (let i = 0; i < 4; i++) {
+    const r = await run({ steps: ["import os\nos.mkfifo('.result.json')\nos._exit(0)"] })
+    if (r.error?.type !== 'Crashed') return `第 ${i + 1} 次：${JSON.stringify(r.error)}`
+  }
+  const r = await run({ steps: ['print(1)'] })
+  return r.ok ? null : JSON.stringify(r.error)
+})
+await test('结果文件换成 /dev/zero 的链接也读不爆', async () => {
+  const r = await run({ steps: ["import os\nos.symlink('/dev/zero', '.result.json')\nos._exit(0)"] })
+  return r.error?.type === 'Crashed' ? null : JSON.stringify(r.error)
+})
+await test('setsid 逃出去的进程、写在 /tmp 和 /dev/shm 的文件，运行完都被收掉', async () => {
+  const leave = `import os, time
+open('/tmp/smoke_leftover', 'w').write('x')
+open('/dev/shm/smoke_leftover', 'w').write('x')
+if os.fork() == 0:
+    os.setsid()
+    time.sleep(600)
+    os._exit(0)`
+  await run({ steps: [leave] })
+  const look = `import os
+me = str(os.getuid())
+others = []
+for p in os.listdir('/proc'):
+    if p.isdigit():
+        try:
+            uid = open(f'/proc/{p}/status').read().split('Uid:')[1].split()[0]
+        except OSError:
+            continue
+        if uid not in ('0', me):
+            others.append(p)
+print(len(others), os.path.exists('/tmp/smoke_leftover'), os.path.exists('/dev/shm/smoke_leftover'))`
+  const r = await run({ steps: [look] })
+  const text = r.outputs
+    .map((o) => o.text ?? '')
+    .join('')
+    .trim()
+  return text === '0 False False' ? null : `别人的进程数、/tmp、/dev/shm：${text || JSON.stringify(r.error)}`
+})
+await test('翻栈帧翻不到参考答案', async () => {
+  const peek = `import sys
+marker = 'SMOKE_' + 'SECRET'  # 拼出来，免得学生代码自己的源码（栈上也有）被当成翻到了
+f, found = sys._getframe(), []
+while f:
+    for v in list(f.f_locals.values()):
+        hit = (
+            isinstance(v, (list, tuple)) and any(isinstance(x, str) and marker in x for x in v)  # reference
+            or isinstance(v, bytes) and marker.encode() in v  # 原始请求体
+            or isinstance(v, str) and v != marker and marker in v
+        )
+        if hit:
+            found.append(f.f_code.co_name)
+    f = f.f_back
+print(found)`
+  const r = await run({ steps: [peek], reference: ['SMOKE_SECRET = 1'], check: { kind: 'none' } })
+  const text = r.outputs
+    .map((o) => o.text ?? '')
+    .join('')
+    .trim()
+  return text === '[]' ? null : `翻到了：${text || JSON.stringify(r.error)}`
 })
 await test('运行器还活着', async () => {
   const h = await call('/health')
