@@ -21,6 +21,7 @@ import { problemRoutes } from './routes/problem'
 import { problemStatsRoutes } from './routes/problem-stats'
 import { submissionRoutes } from './routes/submission'
 import { labRoutes } from './routes/lab'
+import { labelingRoutes } from './routes/labeling'
 import { trialRunRoutes } from './routes/trial-run'
 import { mascotRoutes } from './routes/mascot'
 import { siteRoutes } from './routes/site'
@@ -47,6 +48,7 @@ app.route('/api', problemStatsRoutes)
 app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
 app.route('/api', labRoutes)
+app.route('/api', labelingRoutes)
 app.route('/api', mascotRoutes)
 app.route('/api/admin', adminRoutes)
 

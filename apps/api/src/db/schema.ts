@@ -47,6 +47,8 @@ import type {
   LabCheckKind,
   LabFigureCheck,
   LabStepKind,
+  LabelingKind,
+  LabelingSpan,
   LessonLanguage,
   LessonMode,
   MascotEventKind,
@@ -1610,6 +1612,122 @@ export const labProgress = pgTable(
       columns: [table.labId],
       foreignColumns: [lab.id],
       name: 'lab_progress_lab_id_fk_lab_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 「数据标注」的一节（代码里叫 labeling），设计见 docs/specs/2026-11-17-data-labeling-lab-design.md。
+ * 实验室板块、试验性质：下面三张表只被这个板块用，别的表不外键指向它们，下线就是一份 drop 迁移。
+ * `kind` 建节时定、之后不改（text 文字分类 / image 图片分类 / span 实体标注）；`labels` 是这一节的标签（实体标注里是类别）。
+ */
+export const labeling = pgTable(
+  'labeling',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'labeling_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    title: varchar({ length: 128 }).notNull(),
+    description: text().default('').notNull(),
+    kind: text().$type<LabelingKind>().notNull(),
+    labels: jsonb().$type<string[]>().default([]).notNull(),
+    isPublic: boolean('is_public').default(false).notNull(),
+    /** 后台拖动排的先后；新建的排最后 */
+    order: integer().default(0).notNull(),
+    createdById: integer('created_by_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    // 出题人：删用户要拦住，和「数据分析」一样
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [user.id],
+      name: 'labeling_created_by_id_fk_user_id',
+    }),
+  ],
+)
+
+/**
+ * 一条数据。文字分类、实体标注用 `text`；图片分类用 `image`（存库，浏览器里缩到长边 1280 再传，≤ 2MB），
+ * 图只增不改，所以图片接口可以按条目 id 放心缓存。
+ * 答案：分类是 `answer`（图片刚传上来还没选时是 null，这时不让公开），实体标注是 `spans`（可以是空的：这句没东西要标）。
+ *
+ * **查列表时别 select 整行**：`image` 是 bytea，见 routes 里的 itemColumns。
+ */
+export const labelingItem = pgTable(
+  'labeling_item',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'labeling_item_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    labelingId: integer('labeling_id').notNull(),
+    order: integer().notNull(),
+    text: text().default('').notNull(),
+    image: bytea(),
+    imageType: varchar('image_type', { length: 32 }),
+    answer: text(),
+    spans: jsonb().$type<LabelingSpan[]>().default([]).notNull(),
+    reason: text().default('').notNull(),
+  },
+  (table) => [
+    index('labeling_item_labeling_id_idx').on(table.labelingId, table.order),
+    foreignKey({
+      columns: [table.labelingId],
+      foreignColumns: [labeling.id],
+      name: 'labeling_item_labeling_id_fk_labeling_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 学生 × 条目一行：第一次交的是什么、错了几次、标对的时间。存聚合不存流水，和 lab_progress 一个路数。
+ *
+ * 「第一次就对没有」「最常标成什么」**不落库**，由 `firstLabel` / `firstSpans` 对照**当前**答案现算 ——
+ * 老师改了答案，统计跟着变；`passedAt` 保留（学生当时按当时的答案标对了，不打回去）。见设计文档第 8 节。
+ */
+export const labelingAnswer = pgTable(
+  'labeling_answer',
+  {
+    userId: integer('user_id').notNull(),
+    itemId: integer('item_id').notNull(),
+    // 冗余一份，按节查不用再连 labeling_item
+    labelingId: integer('labeling_id').notNull(),
+    firstLabel: text('first_label'),
+    firstSpans: jsonb('first_spans').$type<LabelingSpan[]>(),
+    wrongCount: integer('wrong_count').default(0).notNull(),
+    passedAt: timestamp('passed_at', { withTimezone: true, mode: 'string' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.itemId], name: 'labeling_answer_pkey' }),
+    index('labeling_answer_labeling_id_idx').on(table.labelingId),
+    // 和 lab_progress 同一档：账号、条目没了，这些作答就没意义
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: 'labeling_answer_user_id_fk_user_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.itemId],
+      foreignColumns: [labelingItem.id],
+      name: 'labeling_answer_item_id_fk_labeling_item_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.labelingId],
+      foreignColumns: [labeling.id],
+      name: 'labeling_answer_labeling_id_fk_labeling_id',
     }).onDelete('cascade'),
   ],
 )

@@ -865,3 +865,45 @@ export function labAssetFileUrl(labId: number, assetId: number) {
 export function trialLabStep(labId: number, body: LabTrialRequest) {
   return api.post<LabRunResult>(`admin/labs/${labId}/trial`, body)
 }
+
+// ---------- 数据标注（labeling） ----------
+
+import type {
+  AdminLabeling,
+  AdminLabelingItem,
+  AdminLabelingListItem,
+  CreateLabelingRequest,
+  LabelingKind,
+  ReorderLabelingsRequest,
+  SaveLabelingRequest,
+} from '@oj2/contract'
+
+export function getAdminLabelings() {
+  return api.get<AdminLabelingListItem[]>('admin/labelings')
+}
+
+export function reorderAdminLabelings(ids: number[]) {
+  return api.put<null>('admin/labeling-order', { ids } satisfies ReorderLabelingsRequest)
+}
+
+export function getAdminLabeling(id: number) {
+  return api.get<AdminLabeling>(`admin/labelings/${id}`)
+}
+
+export function createAdminLabeling(title: string, kind: LabelingKind) {
+  return api.post<AdminLabeling>('admin/labelings', { title, kind } satisfies CreateLabelingRequest)
+}
+
+export function saveAdminLabeling(id: number, body: SaveLabelingRequest) {
+  return api.put<AdminLabeling>(`admin/labelings/${id}`, body)
+}
+
+export function deleteAdminLabeling(id: number) {
+  return api.delete<null>(`admin/labelings/${id}`)
+}
+
+export function uploadLabelingImage(id: number, file: Blob) {
+  const form = new window.FormData()
+  form.append('file', file, 'image.jpg')
+  return api.post<AdminLabelingItem>(`admin/labelings/${id}/images`, form)
+}

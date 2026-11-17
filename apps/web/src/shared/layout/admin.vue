@@ -83,6 +83,13 @@ const NAV: NavGroup[] = [
         to: '/admin/lab/list',
         role: 'teacher',
       },
+      {
+        label: '数据标注',
+        icon: 'ph:tag-simple',
+        path: '/admin/labeling',
+        to: '/admin/labeling/list',
+        role: 'teacher',
+      },
     ],
   },
   {

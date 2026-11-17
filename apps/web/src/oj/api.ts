@@ -613,3 +613,31 @@ export function getLabStudentWork(labId: number, userId: number) {
 export function runLabStudentStep(labId: number, userId: number, stepId: number) {
   return api.post<LabRunResult>(`labs/${labId}/progress/${userId}/steps/${stepId}/run`)
 }
+
+// ---------- 数据标注（labeling） ----------
+
+import type { AnswerLabelingRequest, AnswerLabelingResponse, LabelingDetail, LabelingListItem, LabelingProgress } from '@oj2/contract'
+
+export function getLabelings() {
+  return api.get<LabelingListItem[]>('labelings')
+}
+
+export function getLabeling(id: number) {
+  return api.get<LabelingDetail>(`labelings/${id}`)
+}
+
+export function answerLabeling(id: number, itemId: number, body: AnswerLabelingRequest) {
+  return api.post<AnswerLabelingResponse>(`labelings/${id}/items/${itemId}/answer`, body)
+}
+
+export function resetLabeling(id: number) {
+  return api.post<null>(`labelings/${id}/reset`)
+}
+
+export function labelingImageUrl(id: number, itemId: number) {
+  return `/api/labelings/${id}/items/${itemId}/image`
+}
+
+export function getLabelingProgress(id: number, className?: string | null) {
+  return api.get<LabelingProgress>(`labelings/${id}/progress`, { params: { className: className ?? '' } })
+}
