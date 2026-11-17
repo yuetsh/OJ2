@@ -140,24 +140,88 @@ export interface BoxMistake {
 }
 
 /**
- * 先按重合程度从高到低一对一配对（每个框只配一次），再看每一对：重合够一半比类别，不够一半算框歪了；
- * 答案里没配上的算漏框，学生画的没配上的算多框。
+ * 最大权匹配（匈牙利算法）：w 是 n 行 m 列、n ≤ m，返回每一行配到第几列。
+ * 框最多 100 个，O(n²m) 也就百万次，判一条的时候现算不费事。
+ */
+function maxWeightAssignment(w: number[][], n: number, m: number): number[] {
+  const u = Array<number>(n + 1).fill(0)
+  const v = Array<number>(m + 1).fill(0)
+  const p = Array<number>(m + 1).fill(0)
+  const way = Array<number>(m + 1).fill(0)
+  for (let i = 1; i <= n; i++) {
+    p[0] = i
+    let j0 = 0
+    const minv = Array<number>(m + 1).fill(Infinity)
+    const used = Array<boolean>(m + 1).fill(false)
+    do {
+      used[j0] = true
+      const i0 = p[j0]!
+      let delta = Infinity
+      let j1 = 0
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue
+        const cur = -w[i0 - 1]![j - 1]! - u[i0]! - v[j]!
+        if (cur < minv[j]!) {
+          minv[j] = cur
+          way[j] = j0
+        }
+        if (minv[j]! < delta) {
+          delta = minv[j]!
+          j1 = j
+        }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) {
+          u[p[j]!]! += delta
+          v[j]! -= delta
+        } else {
+          minv[j]! -= delta
+        }
+      }
+      j0 = j1
+    } while (p[j0] !== 0)
+    do {
+      const j1 = way[j0]!
+      p[j0] = p[j1]!
+      j0 = j1
+    } while (j0)
+  }
+  const match = Array<number>(n).fill(-1)
+  for (let j = 1; j <= m; j++) if (p[j]) match[p[j]! - 1] = j - 1
+  return match
+}
+
+/**
+ * 先一对一配对，再看每一对：重合够一半比类别，不够一半算框歪了；答案里没配上的算漏框，学生画的没配上的算多框。
+ *
+ * 配对要整体最优，不能按重合度从高到低先到先得：两个答案框叠得多时（人骑在车上），学生的「车」框可能和答案的
+ * 「人」框重合得更多，先到先得会把它配走，画对了也判成「类别不对 + 框歪了」。所以按这个先后取最好的一组配对：
+ * 全对的对数最多 → 其次重合够一半的最多 → 其次碰到了的最多 → 最后重合度加起来最大。每一档的权重比下一档
+ * 最多 100 对加起来还大，一次最大权匹配就能分出先后。
  */
 export function boxMistakes(answer: LabelingBox[], given: LabelingBox[]): BoxMistake[] {
-  const pairs: { a: number; g: number; iou: number }[] = []
-  answer.forEach((a, ai) =>
-    given.forEach((g, gi) => {
-      const iou = boxIou(a, g)
-      if (iou > 0) pairs.push({ a: ai, g: gi, iou })
-    }),
-  )
-  pairs.sort((p, q) => q.iou - p.iou)
+  const weight = (a: LabelingBox, g: LabelingBox) => {
+    const iou = boxIou(a, g)
+    if (iou <= 0) return 0
+    if (iou < LABELING_BOX_IOU) return 1e3 + iou
+    return (a.label === g.label ? 1e9 : 1e6) + iou
+  }
   const usedA = new Map<number, { g: number; iou: number }>()
   const usedG = new Set<number>()
-  for (const p of pairs) {
-    if (usedA.has(p.a) || usedG.has(p.g)) continue
-    usedA.set(p.a, p)
-    usedG.add(p.g)
+  const pair = (ai: number, gi: number) => {
+    const iou = boxIou(answer[ai]!, given[gi]!)
+    if (iou <= 0) return // 一点没碰到的硬配上了也不算一对：漏一个 + 多一个
+    usedA.set(ai, { g: gi, iou })
+    usedG.add(gi)
+  }
+  if (answer.length && given.length) {
+    if (answer.length <= given.length) {
+      const w = answer.map((a) => given.map((g) => weight(a, g)))
+      maxWeightAssignment(w, answer.length, given.length).forEach((gi, ai) => gi >= 0 && pair(ai, gi))
+    } else {
+      const w = given.map((g) => answer.map((a) => weight(a, g)))
+      maxWeightAssignment(w, given.length, answer.length).forEach((ai, gi) => ai >= 0 && pair(ai, gi))
+    }
   }
   const mistakes: BoxMistake[] = []
   answer.forEach((a, index) => {

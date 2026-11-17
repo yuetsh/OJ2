@@ -102,15 +102,30 @@ async function load() {
 }
 
 async function save() {
+  // 正在传图时不存：传图会把这一节收回不公开，同时在跑的保存可能又把它写回公开，还可能把刚传的图当成「删掉的」
+  if (uploading.value) {
+    message.warning('图片还在传，传完再存')
+    return false
+  }
   saving.value = true
+  const body = toBody()
+  // 存的过程中老师可能又拖了顺序、加了条目：回填按发出去的那几个对象，不按现在的下标
+  const sent = [...form.items]
   try {
-    const saved = await saveAdminLabeling(labelingId.value, toBody())
-    // 新建的条目拿回 id；顺序和发出去的一样
+    const saved = await saveAdminLabeling(labelingId.value, body)
     saved.items.forEach((item, i) => {
-      if (form.items[i]) form.items[i].id = item.id
+      const formItem = sent[i]
+      if (!formItem) return
+      formItem.id = item.id // 新建的条目拿回 id
+      // 服务器存的是去掉首尾空白的文字（实体标注的段跟着挪过）：没在存的过程中又改过的，换成存下的样子
+      const before = body.items[i]!
+      if (formItem.text === before.text && formItem.spans === before.spans && formItem.reason === before.reason) {
+        Object.assign(formItem, { text: item.text, spans: item.spans, reason: item.reason })
+      }
     })
     labeling.value = saved
-    baseline = snapshot()
+    // 基线 = 这次实际存下的；存的过程中又改的仍算「有改动没保存」
+    baseline = JSON.stringify({ ...body, items: saved.items.map(({ id, text, answer, spans, boxes, reason }) => ({ id, text, answer, spans, boxes, reason })) })
     message.success('存好了')
     return true
   } catch (err) {
@@ -257,7 +272,10 @@ async function uploadImages(event: Event) {
       form.items.push(formItem)
       added.push(formItem.key)
       // 传上去就已经在库里了：保存基线跟着加上，免得只传了图也算「有改动没保存」
-      // 服务器同时把这一节收回成不公开（新图还没选标签），基线也跟着改
+      // 服务器同时把这一节收回成不公开（新图还没选标签 / 还没画框），开关和基线都跟着关。
+      // 开关不能只靠上面 unlabeled 的 watch：框选的图「没画框」也是合法答案（图里没东西要框），
+      // unlabeled 恒为 0，开关留着开的话下一次保存又把它公开了，学生会碰上没画框的图。画好了老师自己再打开。
+      form.isPublic = false
       const base = JSON.parse(baseline) as SaveLabelingRequest
       base.isPublic = false
       base.items.push({ id: item.id, text: item.text, answer: item.answer, spans: item.spans, boxes: item.boxes, reason: item.reason })
@@ -339,7 +357,7 @@ onMounted(() => {
           <span class="grow"></span>
           <template v-if="withImage">
             <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="uploadImages" />
-            <n-button size="small" :loading="!!uploading" @click="fileInput?.click()">
+            <n-button size="small" :loading="!!uploading" :disabled="saving" @click="fileInput?.click()">
               {{ uploading ? `传了 ${uploading.done} / ${uploading.total}` : '+ 选图片（可以多选）' }}
             </n-button>
           </template>
@@ -440,7 +458,7 @@ onMounted(() => {
       </section>
 
       <div class="saveBar">
-        <n-button type="primary" :loading="saving" :disabled="!dirty" @click="save">保存</n-button>
+        <n-button type="primary" :loading="saving" :disabled="!dirty || !!uploading" @click="save">保存</n-button>
         <n-text depth="3" class="small">{{ dirty ? '有改动还没保存' : '都存好了' }}</n-text>
         <span class="grow"></span>
         <n-button @click="go('labeling')">试做</n-button>

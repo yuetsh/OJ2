@@ -154,6 +154,15 @@ adminLabelingRoutes.put('/labelings/:id', requireTeacher, async (c) => {
   if (!current) return failure(c, 404, 'labeling-not-found', '这一节不存在')
   const kind = current.kind
   const body = parsed.data
+  // 文字存的时候去掉首尾空白。实体标注的段按字的位置记，开头去掉几个字，段就得一起往前挪几个，
+  // 不然老师在句首多敲个空格，存下来「李白」就成了「白出」，全班都判错。挪完再校验（标到了空白上的会越界报错）。
+  if (kind === 'span') {
+    for (const item of body.items) {
+      const lead = item.text.length - item.text.trimStart().length // 空白都是单个 UTF-16 码元，长度差 = 字数差
+      item.text = item.text.trim()
+      if (lead) item.spans = item.spans.map((s) => ({ ...s, start: s.start - lead, end: s.end - lead }))
+    }
+  }
 
   const existing = await db
     .select({ id: schema.labelingItem.id, imageType: schema.labelingItem.imageType })
