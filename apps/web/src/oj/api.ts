@@ -65,6 +65,7 @@ import {
   type ProblemSetList,
   type ProblemSetLock,
   type ProblemSetProblem,
+  type UnfinishedProblemSet,
   type UserBadge,
   type FlowchartStatistics,
   type SubmissionStatistics,
@@ -505,6 +506,11 @@ export function getProblemSetDetail(id: number) {
 
 export function getProblemSetProblems(problemSetId: number) {
   return api.get<ProblemSetProblem[]>(`problem-sets/${problemSetId}/problems`)
+}
+
+/** 首页「没做完的专题」：最多三个，最近碰过的在前 */
+export function getUnfinishedProblemSets() {
+  return api.get<UnfinishedProblemSet[]>('problem-sets/unfinished')
 }
 
 export function joinProblemSet(problemSetId: number) {

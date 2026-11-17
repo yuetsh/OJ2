@@ -7,6 +7,7 @@ import {
   type ProblemSetList,
   type ProblemSetLock,
   type ProblemSetProblem,
+  type UnfinishedProblemSet,
   type UserBadge,
 } from '@oj2/contract'
 import { and, asc, count, desc, eq, ilike, inArray, isNull, notInArray, or, sql } from 'drizzle-orm'
@@ -203,6 +204,84 @@ problemsetRoutes.get('/problem-sets/locks', requireAuth, async (c) => {
   if (!problemId) return success(c, [] as ProblemSetLock[])
   const rows = await problemSetLocksFor(user.id, problemId)
   return success(c, rows satisfies ProblemSetLock[])
+})
+
+/** 首页只提这么久之内碰过的：上学期、去年没做完的再挂出来只是噪音 */
+const UNFINISHED_WINDOW_DAYS = 60
+const UNFINISHED_LIMIT = 3
+
+// 首页「没做完的专题」：加入了、必做题没做完、最近碰过的，最近的在前，带下一道该做的题
+problemsetRoutes.get('/problem-sets/unfinished', requireAuth, async (c) => {
+  const user = c.get('user')!
+  const rows = await db
+    .select({
+      id: schema.problemset.id,
+      title: schema.problemset.title,
+      joinTime: schema.problemsetProgress.joinTime,
+      detail: schema.problemsetProgress.progressDetail,
+      completedCount: schema.problemsetProgress.completedProblemsCount,
+      totalCount: schema.problemsetProgress.totalProblemsCount,
+    })
+    .from(schema.problemsetProgress)
+    .innerJoin(schema.problemset, eq(schema.problemset.id, schema.problemsetProgress.problemsetId))
+    .where(
+      and(
+        eq(schema.problemsetProgress.userId, user.id),
+        eq(schema.problemsetProgress.isCompleted, false),
+        sql`${schema.problemsetProgress.totalProblemsCount} > 0`,
+        eq(schema.problemset.visible, true),
+      ),
+    )
+  const since = Date.now() - UNFINISHED_WINDOW_DAYS * 864e5
+  const recent = rows
+    .map((row) => {
+      const detail = asRecord(row.detail)
+      // 进度里每道做对的题记着 submit_time
+      let lastActiveTime = row.joinTime
+      for (const entry of Object.values(detail)) {
+        const time = asRecord(entry).submit_time
+        if (typeof time === 'string' && new Date(time).getTime() > new Date(lastActiveTime).getTime()) lastActiveTime = new Date(time).toISOString()
+      }
+      return { ...row, detail, lastActiveTime }
+    })
+    .filter((row) => new Date(row.lastActiveTime).getTime() >= since)
+    .sort((a, b) => new Date(b.lastActiveTime).getTime() - new Date(a.lastActiveTime).getTime())
+    .slice(0, UNFINISHED_LIMIT)
+  if (recent.length === 0) return success(c, [] as UnfinishedProblemSet[])
+  // 顺序和专题详情页一样：order，再按 id 定死并列
+  const links = await db
+    .select({
+      problemsetId: schema.problemsetProblem.problemsetId,
+      problemId: schema.problemsetProblem.problemId,
+      isRequired: schema.problemsetProblem.isRequired,
+      displayId: schema.problem.displayId,
+      title: schema.problem.title,
+    })
+    .from(schema.problemsetProblem)
+    .innerJoin(schema.problem, eq(schema.problemsetProblem.problemId, schema.problem.id))
+    .where(
+      inArray(
+        schema.problemsetProblem.problemsetId,
+        recent.map((row) => row.id),
+      ),
+    )
+    .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id))
+  return success(
+    c,
+    recent.map((row) => {
+      const own = links.filter((link) => link.problemsetId === row.id)
+      const graded = gradedIds(own)
+      const next = own.find((link) => graded.has(link.problemId) && row.detail[String(link.problemId)] === undefined)
+      return {
+        id: row.id,
+        title: row.title,
+        completedCount: row.completedCount,
+        totalCount: row.totalCount,
+        next: next ? { id: next.problemId, _id: next.displayId, title: next.title } : null,
+        lastActiveTime: row.lastActiveTime,
+      } satisfies UnfinishedProblemSet
+    }),
+  )
 })
 
 problemsetRoutes.get('/problem-sets/:id', optionalAuth, async (c) => {

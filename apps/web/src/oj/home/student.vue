@@ -2,7 +2,17 @@
 import { displayName } from '@oj2/contract'
 import { continueStep, doneCount, tutorialPath, splitTitle, type TutorialType } from 'oj/learn/utils'
 import { Icon } from '@iconify/vue'
-import { getAnnouncementList, getKnowledgeMap, getContestList, getLastVisit, getLearnProgress, getSubmissions, getTutorials, getWeeklyRank } from 'oj/api'
+import {
+  getAnnouncementList,
+  getKnowledgeMap,
+  getContestList,
+  getLastVisit,
+  getLearnProgress,
+  getSubmissions,
+  getTutorials,
+  getUnfinishedProblemSets,
+  getWeeklyRank,
+} from 'oj/api'
 import { getClassActivity } from 'shared/api'
 import SubmissionResultTag from 'shared/components/SubmissionResultTag.vue'
 import { levelName, MAX_LEVEL, pickHeadline, remainingToNext, tagLink, type Headline } from 'oj/user/knowledge'
@@ -11,7 +21,17 @@ import { activityMode } from 'shared/store/lesson'
 import { focusJumpAction, goAction, randomProblemAction, useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { ContestStatus, CONTEST_STATUS, JUDGE_STATUS, LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { duration, parseTime, zonedParts, zonedYear } from 'utils/functions'
-import type { AnnouncementListItem, ClassActivity, ClassActivityProblem, Contest, KnowledgeMap, LastVisit, SubmissionListItem, WeeklyRank } from 'utils/types'
+import type {
+  AnnouncementListItem,
+  ClassActivity,
+  ClassActivityProblem,
+  Contest,
+  KnowledgeMap,
+  LastVisit,
+  SubmissionListItem,
+  UnfinishedProblemSet,
+  WeeklyRank,
+} from 'utils/types'
 
 interface Track {
   type: TutorialType
@@ -35,6 +55,7 @@ const announcements = ref<AnnouncementListItem[]>([])
 const weekly = ref<WeeklyRank | null>(null)
 const classActivity = ref<ClassActivity | null>(null)
 const lastVisit = ref<LastVisit | null>(null)
+const unfinishedSets = ref<UnfinishedProblemSet[]>([])
 /** 知识点地图挑出来的那一句（本周升级 / 再做几道升档 / 去点亮一个），见 oj/user/knowledge.ts */
 const knowledgeHeadline = ref<Headline | null>(null)
 /** 地图原样留着给看板娘：她要知识点名、档位名、还差几道，不是拼好的那句话 */
@@ -132,6 +153,15 @@ async function loadKnowledge() {
 
 async function loadClassActivity() {
   classActivity.value = await getClassActivity()
+}
+
+async function loadUnfinishedSets() {
+  unfinishedSets.value = await getUnfinishedProblemSets()
+}
+
+/** 直接进下一道题（带专题上下文，题目页有专题条）；必做都做完、只差选做时进专题页 */
+function unfinishedLink(set: UnfinishedProblemSet) {
+  return set.next ? { name: 'problemset problem', params: { problemSetId: set.id, problemID: set.next._id } } : `/problemset/${set.id}`
 }
 
 async function loadLastVisit() {
@@ -238,6 +268,7 @@ async function load() {
     loadClassActivity(),
     loadLastVisit(),
     loadKnowledge(),
+    loadUnfinishedSets(),
   ])
   loaded.value = true
 }
@@ -453,6 +484,20 @@ function contestTime(contest: Contest) {
             </n-tag>
             <span class="row-title">{{ item.problemDisplayId }} {{ item.title }}</span>
             <n-text v-if="item.userCount" depth="3" class="row-meta"> {{ item.acceptedCount }}/{{ item.userCount }} 人做对 </n-text>
+          </router-link>
+        </n-card>
+
+        <!-- 没做完的专题：课上做一两节就停的人很多，下次进来从这里接着做 -->
+        <n-card v-if="unfinishedSets.length" title="没做完的专题" :bordered="false" class="card">
+          <router-link v-for="set in unfinishedSets" :key="set.id" :to="unfinishedLink(set)" class="row">
+            <!-- 名字和进度上下两行：手机上排一行，专题名只剩三四个字 -->
+            <div class="unsolved-main">
+              <span class="row-title">{{ set.title }}</span>
+              <n-text depth="3" class="row-meta" :title="set.next ? `${set.next._id} ${set.next.title}` : undefined">
+                做对 {{ set.completedCount }}/{{ set.totalCount }}<template v-if="set.next"> · 下一题 {{ set.next._id }}</template>
+              </n-text>
+            </div>
+            <n-button type="primary" tag="span" size="small">接着做</n-button>
           </router-link>
         </n-card>
 

@@ -143,6 +143,22 @@ export const problemSetLockSchema = z.object({
   assignedUntil: z.string(),
 })
 
+/**
+ * 首页「没做完的专题」的一行：加入了、必做题还没做完的专题，带下一道该做的题。
+ * 课上做一两节就停的人很多（2026-11 快照：做了一部分就停的占加入人次的 45%，交过的题几乎都做对了，
+ * 是后面的题没打开过），下次进来得有个接着做的入口。
+ */
+export const unfinishedProblemSetSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  completedCount: z.number().int(),
+  totalCount: z.number().int(),
+  /** 必做题里按顺序第一道还没做对的 */
+  next: z.object({ id: z.number().int(), _id: z.string(), title: z.string() }).nullable(),
+  /** 加入或最近一次在专题里做对题的时刻，按它排先后 */
+  lastActiveTime: z.string(),
+})
+
 export const userBadgeSchema = z.object({
   id: z.number().int(),
   userId: z.number().int(),
@@ -158,6 +174,7 @@ export type ProblemSetProblem = z.infer<typeof problemSetProblemSchema>
 export type ProblemSetClassView = z.infer<typeof problemSetClassViewSchema>
 export type ProblemSetClassStudent = z.infer<typeof problemSetClassStudentSchema>
 export type ProblemSetLock = z.infer<typeof problemSetLockSchema>
+export type UnfinishedProblemSet = z.infer<typeof unfinishedProblemSetSchema>
 export type UserBadge = z.infer<typeof userBadgeSchema>
 export type BadgeConditionType = z.infer<typeof badgeConditionTypeSchema>
 

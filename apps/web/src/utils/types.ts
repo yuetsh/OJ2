@@ -180,6 +180,7 @@ export type {
   ProblemSetClassView,
   ProblemSetClassStudent,
   ProblemSetLock,
+  UnfinishedProblemSet,
   UserBadge,
 } from '@oj2/contract'
 
