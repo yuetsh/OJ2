@@ -24,3 +24,30 @@ export function labelColor(labels: string[], label: string, dark: boolean) {
   const index = Math.max(0, labels.indexOf(label))
   return (dark ? DARK : LIGHT)[index % LIGHT.length]!
 }
+
+/**
+ * 实体标注的标题里出现了类别名（「标出人名和地名」），就把那几个字铺上对应的颜色，学生一眼知道哪个颜色是哪一类。
+ * 按字面找，长的类别名先匹配（「地名」和「外国地名」都在时不会只铺半截）。`missing`：有类别标题里没写到。
+ */
+export function titlePieces(title: string, labels: string[]) {
+  const names = labels.filter(Boolean).sort((a, b) => b.length - a.length)
+  const pieces: { text: string; label: string | null }[] = []
+  const seen = new Set<string>()
+  let plain = ''
+  let at = 0
+  while (at < title.length) {
+    const hit = names.find((name) => title.startsWith(name, at))
+    if (hit) {
+      if (plain) pieces.push({ text: plain, label: null })
+      plain = ''
+      pieces.push({ text: hit, label: hit })
+      seen.add(hit)
+      at += hit.length
+    } else {
+      plain += title[at]
+      at += 1
+    }
+  }
+  if (plain) pieces.push({ text: plain, label: null })
+  return { pieces, missing: labels.some((label) => !seen.has(label)) }
+}

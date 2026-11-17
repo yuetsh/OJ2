@@ -10,6 +10,7 @@ import { answerLabeling, getLabeling, resetLabeling } from 'oj/api'
 import LabelingImage from './components/LabelingImage.vue'
 import SpanPicker from './components/SpanPicker.vue'
 import SpanText from './components/SpanText.vue'
+import { labelColor, titlePieces } from './utils/colors'
 
 /**
  * 学生做一节「数据标注」（画布 LabelStudent / LabelSpanStudent），手机为先：
@@ -20,6 +21,7 @@ import SpanText from './components/SpanText.vue'
 const props = defineProps<{ labelingID: string }>()
 
 const theme = useThemeVars()
+const isDark = useDark()
 const message = useMessage()
 const dialog = useDialog()
 const router = useRouter()
@@ -38,6 +40,12 @@ const spans = ref<LabelingSpan[]>([])
 const sending = ref(false)
 
 const current = computed(() => detail.value?.current ?? null)
+/** 实体标注：标题里的类别名铺颜色；标题没写全类别，就在标题下补一行带色块的类别（设计稿 LabelSpanDesk） */
+const title = computed(() => {
+  const d = detail.value
+  if (!d || d.kind !== 'span') return { pieces: [{ text: d?.title ?? '', label: null }], missing: false }
+  return titlePieces(d.title, d.labels)
+})
 const result = computed(() => detail.value?.result ?? null)
 const correct = computed(() => verdict.value?.correct === true)
 
@@ -122,9 +130,24 @@ onMounted(load)
     <template v-else>
       <router-link :to="{ name: 'labelings' }" class="back"><Icon icon="ph:caret-left-bold" />数据标注</router-link>
       <h1 class="title">
-        {{ detail.title }}
+        <span
+          ><template v-for="(p, i) in title.pieces" :key="i"
+            ><span
+              v-if="p.label"
+              class="titleMark"
+              :style="{ background: labelColor(detail.labels, p.label, isDark).bg, color: labelColor(detail.labels, p.label, isDark).fg }"
+              >{{ p.text }}</span
+            ><template v-else>{{ p.text }}</template></template
+          ></span
+        >
         <n-tag v-if="!detail.isPublic" size="small" :bordered="false" type="warning">没公开</n-tag>
       </h1>
+
+      <div v-if="detail.kind === 'span' && title.missing" class="legend">
+        <span v-for="label in detail.labels" :key="label" class="legendItem"
+          ><span class="swatch" :style="{ background: labelColor(detail.labels, label, isDark).swatch }"></span>{{ label }}</span
+        >
+      </div>
 
       <div v-if="userStore.isTeacherOrAbove" class="teacherBar">
         <n-button v-if="detail.canReset && (detail.passedCount || result)" @click="reset">重来</n-button>
@@ -225,6 +248,31 @@ onMounted(load)
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.titleMark {
+  padding: 1px 5px;
+  margin: 0 2px;
+  border-radius: 5px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 15px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }
 
 .desc {
