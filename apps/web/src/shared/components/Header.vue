@@ -107,12 +107,13 @@ const navLinks = computed<NavLink[]>(() =>
 )
 
 /**
- * 排在最后的「实验室」：点开是下拉，放不是天天做题的新玩法（2026-11-12 用户要的，第一个是「数据分析」）。
+ * 排在最后的「实验室」：点开是下拉，放不是天天做题的新玩法（2026-11-12 用户要的）。
+ * 数据标注排在数据分析前面：不用写代码、门槛低，也是数据处理流程里先做的那步。
  * key 同样是一级路径，下拉里任一项是当前页时「实验室」亮着。
  */
 const labLinks: NavLink[] = [
-  { key: 'lab', label: '数据分析', to: '/lab' },
   { key: 'labeling', label: '数据标注', to: '/labeling' },
+  { key: 'lab', label: '数据分析', to: '/lab' },
 ]
 const labMenu: DropdownOption[] = labLinks.map((link) => ({ label: link.label, key: link.key }))
 const labActive = computed(() => labLinks.some((link) => link.key === active.value))
