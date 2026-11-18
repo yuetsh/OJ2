@@ -3,6 +3,7 @@ import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import RankAvatar from 'shared/components/RankAvatar.vue'
 import type { ClassMember } from '@oj2/contract'
+import ClassSelect from './ClassSelect.vue'
 import { groupClassOptions } from 'utils/classes'
 import { errorCode } from 'utils/api'
 import { STORAGE_KEY } from 'utils/constants'
@@ -66,9 +67,10 @@ const passwordRef = useTemplateRef('passwordRef')
 const usernameRef = useTemplateRef('usernameRef')
 
 const knownClasses = computed(() => configStore.config?.classList ?? [])
-const classOptions = computed(() => groupClassOptions(knownClasses.value))
-/** 还没选过班的电脑：名单的位置先摆一排排班级 */
-const classGroups = computed(() => classOptions.value.flatMap((option) => ('children' in option ? [{ label: option.label, items: option.children }] : [])))
+/** 还没选过班的电脑：名单的位置先摆一排排班级（和下拉同一个分组） */
+const classGroups = computed(() =>
+  groupClassOptions(knownClasses.value).flatMap((option) => ('children' in option ? [{ label: option.label, items: option.children }] : [])),
+)
 
 // 名字支持拼音和拼音缩写搜索（张三 ← zhangsan / zs）。pinyin-pro 带着一份几百 K 的
 // 词典，静态引入会压进首屏 —— 改成打开登录框才拉，已登录的人一次都不会下载。
@@ -265,15 +267,8 @@ watch(
     <div class="box" :style="themeVars" :class="mode" role="dialog" aria-label="登录">
       <div class="head">
         <h2>登录</h2>
-        <n-select
-          v-if="mode === 'pick'"
-          v-model:value="klass"
-          class="klass"
-          :options="classOptions"
-          filterable
-          placeholder="选班级"
-          :consistent-menu-width="false"
-        />
+        <!-- 登录是点自己的名字，没填班级的号没有名单，点「名单里没有我」输用户名 -->
+        <ClassSelect v-if="mode === 'pick'" v-model:value="klass" :no-class="false" class="klass" :consistent-menu-width="false" />
         <span class="grow"></span>
         <button class="close" type="button" aria-label="关闭" @click="authStore.closeLoginModal()">
           <Icon icon="ph:x" :width="18" />

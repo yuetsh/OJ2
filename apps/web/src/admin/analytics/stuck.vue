@@ -4,8 +4,7 @@ import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import type { StuckProblem, StuckProblemDetail } from 'utils/types'
 import { getStuckProblemDetail, getStuckProblems } from 'admin/api'
-import { useConfigStore } from 'shared/store/config'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { periodRange, type Period } from 'oj/statistics/period'
 import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
@@ -22,7 +21,6 @@ import { avgTries, rate } from './components/stuckMath'
  * 选了一个班时默认 10 人，相当于「课上布置过的」，不然会混进一两个人自己做的题。
  */
 const router = useRouter()
-const configStore = useConfigStore()
 const { isMobile } = useBreakpoints()
 const theme = useThemeVars()
 
@@ -45,7 +43,6 @@ const detail = ref<StuckProblemDetail | null>(null)
 const loading = ref(false)
 const detailLoading = ref(false)
 
-const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 const threshold = computed(() => Number(min.value) || (className.value ? 10 : 20))
 const thresholdOptions = computed(() => THRESHOLDS.map((n) => ({ label: `至少 ${n} 人做过`, value: n })))
 
@@ -161,15 +158,7 @@ onMounted(load)
     <div class="top">
       <span class="title">卡点分析</span>
       <span class="grow" />
-      <n-select
-        :value="className || null"
-        :options="classOptions"
-        filterable
-        clearable
-        placeholder="全部班级"
-        style="width: 170px"
-        @update:value="(value: string | null) => (className = value ?? '')"
-      />
+      <ClassSelect v-model:value="className" all style="width: 170px" />
       <div class="seg">
         <button v-for="option in PERIODS" :key="option.value" type="button" :class="{ on: period === option.value }" @click="period = option.value">
           {{ option.label }}

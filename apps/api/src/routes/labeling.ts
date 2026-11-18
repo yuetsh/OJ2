@@ -24,7 +24,7 @@ import { failure, parseBody, success } from '../http'
 import { suggestActiveClass } from '../services/class-activity'
 import { boxesError, firstCorrect, itemColumns, judge, spansError, type ItemRow } from '../services/labeling'
 import { adminItem } from './admin/labeling'
-import { queryInteger } from './helpers'
+import { queryInteger, rosterCondition } from './helpers'
 
 export const labelingRoutes = new Hono<AppEnv>()
 
@@ -283,7 +283,12 @@ labelingRoutes.get('/labelings/:id/progress', requireTeacher, async (c) => {
     ? await db
         .select({ id: schema.user.id, username: schema.user.username, className: schema.user.className })
         .from(schema.user)
-        .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
+        .where(
+          rosterCondition(
+            className,
+            db.select({ id: schema.labelingAnswer.userId }).from(schema.labelingAnswer).where(eq(schema.labelingAnswer.labelingId, labeling.id)),
+          ),
+        )
         .orderBy(asc(schema.user.username))
     : []
   const answers = students.length

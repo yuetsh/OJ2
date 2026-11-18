@@ -4,9 +4,8 @@ import { useThemeVars } from 'naive-ui'
 import type { LearnBoard, LearnBoardStudent, LearnExerciseProgress } from 'utils/types'
 import { getLearnBoard, getLearnExercises } from 'admin/api'
 import { parseTime, readableDuration } from 'utils/functions'
-import { useConfigStore } from 'shared/store/config'
 import UserName from 'shared/components/UserName.vue'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { groupByProject, splitTitle, type TutorialType } from 'oj/learn/utils'
 import 'oj/learn/learn.css'
 import ExerciseAttempts from './ExerciseAttempts.vue'
@@ -23,7 +22,6 @@ import { EXERCISE_KIND } from './kinds'
  * 点一道看每个人的情况。配套题做对不论早晚，读这课之前在课上做对的也算。
  * 不选班就按排名页同一套规则猜老师在教哪个班。
  */
-const configStore = useConfigStore()
 const theme = useThemeVars()
 
 const type = ref<TutorialType>('python')
@@ -38,7 +36,6 @@ const studentId = ref<number | null>(null)
 const showStudent = ref(false)
 const loading = ref(false)
 
-const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 const groups = computed(() => groupByProject((board.value?.tutorials ?? []).map(({ id, title, project }) => ({ id, title, project }))))
 const started = computed(() =>
   (board.value?.students ?? [])
@@ -206,7 +203,7 @@ onMounted(load)
         <button type="button" :class="{ on: type === 'python' }" @click="pickType('python')">Python</button>
         <button type="button" :class="{ on: type === 'c' }" @click="pickType('c')">C 语言</button>
       </div>
-      <n-select v-model:value="className" :options="classOptions" filterable placeholder="选班级" class="class-select" />
+      <ClassSelect v-model:value="className" class="class-select" />
     </div>
 
     <n-spin :show="loading">

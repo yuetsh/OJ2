@@ -35,7 +35,7 @@ import {
   dataAnalysisAssetsPayload,
   runDataAnalysis,
 } from '../services/data-analysis'
-import { queryInteger } from './helpers'
+import { queryInteger, rosterCondition } from './helpers'
 
 export const dataAnalysisRoutes = new Hono<AppEnv>()
 
@@ -330,7 +330,15 @@ dataAnalysisRoutes.get('/data-analyses/:id/progress', requireTeacher, async (c) 
     ? await db
         .select({ id: schema.user.id, username: schema.user.username, className: schema.user.className })
         .from(schema.user)
-        .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
+        .where(
+          rosterCondition(
+            className,
+            db
+              .select({ id: schema.dataAnalysisProgress.userId })
+              .from(schema.dataAnalysisProgress)
+              .where(eq(schema.dataAnalysisProgress.dataAnalysisId, dataAnalysis.id)),
+          ),
+        )
         .orderBy(asc(schema.user.username))
     : []
   const progress = students.length

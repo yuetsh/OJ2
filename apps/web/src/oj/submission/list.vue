@@ -9,7 +9,6 @@ import Pagination from 'shared/components/Pagination.vue'
 import { useBackClose } from 'shared/composables/backClose'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { usePagination } from 'shared/composables/pagination'
-import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
 import { useMascotGuide } from 'shared/mascot/guide'
 import { LANGUAGE_SHOW_VALUE, SubmissionStatus } from 'utils/constants'
@@ -18,9 +17,10 @@ import type { FlowchartSubmissionListItem, LANGUAGE, SubmissionListItem } from '
 import { FlowchartSubmissionStatus } from 'utils/types'
 import FlowchartState from './components/FlowchartState.vue'
 import StatusPill from './components/StatusPill.vue'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import UserName from 'shared/components/UserName.vue'
 import { useTone } from 'shared/composables/tone'
-import { classLabel, classSelectOptions } from 'utils/classes'
+import { classLabel } from 'utils/classes'
 import { submissionClockText, submissionDayText } from './utils'
 import { useLessonFilter } from './composables/lessonFilter'
 import { useListLive } from './composables/listLive'
@@ -46,7 +46,6 @@ const StatisticsView = defineAsyncComponent(() => import('oj/statistics/componen
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const configStore = useConfigStore()
 const contestStore = useContestStore()
 const message = useMessage()
 const theme = useThemeVars()
@@ -389,8 +388,6 @@ const languageOptions = [
   { label: 'SQL', value: 'SQL' },
 ]
 
-const classOptions = computed(() => classSelectOptions(configStore.config?.classList ?? [], query.className))
-
 const contestProblemOptions = computed(() => [
   { label: '全部题目', value: '' },
   ...contestStore.problems.map((problem) => ({
@@ -608,16 +605,7 @@ function dayBreak(index: number) {
             <Icon icon="ph:x-bold" :width="12" class="lesson-x" />
           </template>
         </button>
-        <n-select
-          v-if="!lessonActive"
-          :value="query.className || null"
-          class="w-class"
-          :options="classOptions"
-          placeholder="全部班级"
-          clearable
-          filterable
-          @update:value="(v: string | null) => (query.className = v ?? '')"
-        />
+        <ClassSelect v-if="!lessonActive" v-model:value="query.className" all class="w-class" />
       </template>
 
       <!-- 按整名只看一个人（「只看他」、协作条、任务页点进来）：用户名有八九个字，塞进 108px 的
@@ -715,15 +703,7 @@ function dayBreak(index: number) {
             <Icon icon="ph:x-bold" :width="12" class="lesson-x" />
           </template>
         </button>
-        <n-select
-          v-if="!lessonActive"
-          :value="query.className || null"
-          :options="classOptions"
-          placeholder="全部班级"
-          clearable
-          filterable
-          @update:value="(v: string | null) => (query.className = v ?? '')"
-        />
+        <ClassSelect v-if="!lessonActive" v-model:value="query.className" all />
       </template>
       <button v-if="!mine && exactPerson" class="chip on person" @click="clearPerson">
         <Icon icon="ph:user-bold" :width="12" />

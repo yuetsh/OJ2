@@ -2,10 +2,10 @@
 import type { ClassBattleItem, RankBoard, RankPeriod, RankRow, RankScope, WeeklyChampion } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { clearMood, getClassBattle, getRankBoard, getWeeklyChampions, setRankHidden } from 'oj/api'
-import { classLabel, groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
+import { classLabel } from 'utils/classes'
 import UserName from 'shared/components/UserName.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
-import { useConfigStore } from 'shared/store/config'
 import { useUserStore } from 'shared/store/user'
 import { useMascotGuide } from 'shared/mascot/guide'
 import { errorCode } from 'utils/api'
@@ -36,7 +36,6 @@ const dialog = useDialog()
 const theme = useThemeVars()
 const palette = useRankPalette()
 const userStore = useUserStore()
-const configStore = useConfigStore()
 const { isDesktop } = useBreakpoints()
 
 const teacher = computed(() => userStore.isTeacherOrAbove)
@@ -220,12 +219,6 @@ const minis = computed<MiniRank[]>(() => {
   return list.slice(0, 3)
 })
 
-const teacherClassOptions = computed(() => {
-  const list = configStore.config?.classList ?? []
-  const all = teacherClass.value ? [teacherClass.value, ...list] : list
-  return [{ label: '全部', value: '' }, ...groupClassOptions(all)]
-})
-
 const myBattle = computed(() => battle.value.find((item) => item.className === classContext.value))
 
 const daysLeft = computed(() => {
@@ -375,7 +368,8 @@ async function restore(userId: number) {
           {{ option.label }}
         </button>
       </div>
-      <n-select v-if="teacher" v-model:value="pickedClass" class="class-select" filterable placeholder="选班" :options="teacherClassOptions" />
+      <!-- 没填班级的号没有年级，「本班」要列 0 分的人，两百多个不相干的号排一张榜没有意义 -->
+      <ClassSelect v-if="teacher" v-model:value="pickedClass" all :no-class="false" placeholder="全部" class="class-select" />
     </div>
 
     <div class="main" :class="{ single: !isDesktop }">

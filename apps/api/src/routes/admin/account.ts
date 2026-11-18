@@ -4,7 +4,6 @@ import {
   deleteUsersRequestSchema,
   displayName,
   legacyClassOf,
-  NO_CLASS,
   type CheckUsernamesResponse,
   importUsersRequestSchema,
   STUDENT_ROLES,
@@ -19,7 +18,7 @@ import {
 } from '@oj2/contract'
 import { randomInt } from 'node:crypto'
 import { z } from 'zod'
-import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 
 import { hashPassword } from '../../auth/password'
@@ -28,7 +27,7 @@ import { revokeUserSessions } from '../../auth/session'
 import { requireSuperAdmin, type AppEnv } from '../../auth/middleware'
 import { db, schema } from '../../db'
 import { failure, parseBody, success } from '../../http'
-import { classKeywordCondition, queryInteger, sampleUser } from '../helpers'
+import { classCondition, classKeywordCondition, queryInteger, sampleUser } from '../helpers'
 import { publishConfigUpdate } from '../../events'
 import { getWebsiteOptions } from '../../services/options'
 import { usernameCondition } from '../../services/username-search'
@@ -152,7 +151,7 @@ adminAccountRoutes.get('/users', requireSuperAdmin, async (c) => {
   // 班级：和全站班级下拉同一套值，NO_CLASS 是「没填班级」
   const className = c.req.query('className')?.trim()
   if (className) {
-    filters.push(className === NO_CLASS ? isNull(schema.user.className) : eq(schema.user.className, className))
+    filters.push(classCondition(className))
   }
   const where = filters.length ? and(...filters) : undefined
   // 在线状态每行都要下发（列表里显示），所以不管怎么排都先取一次

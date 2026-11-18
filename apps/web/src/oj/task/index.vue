@@ -4,12 +4,11 @@ import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import { getTaskBoard } from 'oj/api'
 import { useTone } from 'shared/composables/tone'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import UserName from 'shared/components/UserName.vue'
 import { useLeaveStudents } from 'shared/composables/leaveStudents'
 import { useTeacherHelp } from 'shared/composables/teacherHelp'
 import { useCollabStore } from 'shared/store/collab'
-import { useConfigStore } from 'shared/store/config'
 import { requestSpeech } from 'shared/mascot/behavior'
 import { useMascotGuide, type MascotAction, type MascotGuide } from 'shared/mascot/guide'
 import { errorMessage } from 'utils/api'
@@ -42,7 +41,6 @@ import { cellStage, cellStyle as cellStyleOf, cellText as cellTextOf, cellTitle 
 
 const REFRESH_MS = 15_000
 
-const configStore = useConfigStore()
 const collabStore = useCollabStore()
 const message = useMessage()
 const theme = useThemeVars()
@@ -62,11 +60,6 @@ const className = ref<string | null>(queryText(route.query.className))
 /** ?problem= 带来的题号：加载完选中那道题，下面展开它的错法（「讲这道题」） */
 let wantedProblem = queryText(route.query.problem)
 
-const classOptions = computed(() => {
-  const list = configStore.config?.classList ?? []
-  return groupClassOptions(board.value?.className ? [board.value.className, ...list] : list)
-})
-
 async function load() {
   if (document.hidden) return
   try {
@@ -85,7 +78,8 @@ async function load() {
   }
 }
 
-function changeClass(value: string) {
+function changeClass(value: string | null) {
+  if (!value) return
   className.value = value
   selectedId.value = null
   editing.value = false
@@ -680,7 +674,8 @@ function lastText(student: TaskBoardStudent) {
 <template>
   <div class="board">
     <div class="toolbar">
-      <n-select :value="className" :options="classOptions" placeholder="选择班级" filterable class="class-select" @update:value="changeClass" />
+      <!-- 课堂任务是给一个真班布置、看这节课的，没填班级的号凑不成一个班 -->
+      <ClassSelect :value="className" :no-class="false" placeholder="选择班级" class="class-select" @update:value="changeClass" />
 
       <!-- 这节课的题：当场填，填完收成一排小块 -->
       <LessonForm

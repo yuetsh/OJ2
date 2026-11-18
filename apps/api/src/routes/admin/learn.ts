@@ -1,5 +1,6 @@
 import {
   FLOWCHART_PASS_GRADES,
+  NO_CLASS,
   STUDENT_ROLES,
   isTutorialDone,
   type LearnBoard,
@@ -18,7 +19,7 @@ import { failure, success } from '../../http'
 import { accepted } from '../../services/learning-stats'
 import { defaultClassFor } from '../../services/ranking'
 import { exerciseCountColumn, tutorialProblems } from '../../services/tutorial'
-import { queryInteger, rounded } from '../helpers'
+import { queryInteger, rosterCondition, rounded } from '../helpers'
 
 /**
  * 自学情况：教程读了没、读了多久。
@@ -33,32 +34,33 @@ function tutorialTypeOf(value: string | undefined) {
 }
 
 /**
- * 班级筛选。班号形如 `241`（24 级 1 班），只允许纯数字：
+ * 班级筛选。班号形如 `241`（24 级 1 班），只允许纯数字（外加 NO_CLASS「没填班级」）：
  * 直接拼进 like 的话，`%` 会变成通配符，把筛选变成「全选」。
  */
 function classFilter(className: string | undefined) {
   const value = className?.trim()
   if (!value) return { ok: true as const, value: null }
+  if (value === NO_CLASS) return { ok: true as const, value }
   if (!/^\d{1,4}$/.test(value)) return { ok: false as const, value: null }
   return { ok: true as const, value }
 }
 
 /**
- * `className` 传 3 位以上是具体班级（精确匹配），传 1-2 位当年级前缀（like）。
+ * 这个班的学生：`className` 传 3 位以上是具体班级，传 1-2 位当年级前缀（like）。
  * 年级前缀这条是给「24 级整体读得怎么样」用的，不然老师得一个班一个班点。
- */
-function classCondition(value: string | null) {
-  if (!value) return undefined
-  return value.length >= 3 ? eq(schema.user.className, value) : like(schema.user.className, `${value}%`)
-}
-
-/**
- * 没有班级的学生**照样统计**（班级列显示为空）。班级是建号时给的（老号当年从用户名的 ks 前缀推），
- * 没给就是 null，把这些人过滤掉等于让他们
- * 在「谁没学」这张表上凭空消失 —— 班级榜可以只算入班的人，这里不行。
+ *
+ * 不选班时没有班级的学生**照样统计**（班级列显示为空）：把这些人过滤掉等于让他们在「谁没学」
+ * 这张表上凭空消失 —— 班级榜可以只算入班的人，这里不行。具体班级和「没填班级」走全站同一个
+ * rosterCondition：没填班级的只圈自学过的人（教程读过或练一练做过）。
  */
 function studentCondition(value: string | null) {
-  return and(eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES]), classCondition(value))
+  if (value && (value.length >= 3 || value === NO_CLASS))
+    return rosterCondition(value, sql`(select user_id from ${schema.tutorialProgress} union select user_id from ${schema.exerciseAttempt})`)
+  return and(
+    eq(schema.user.isDisabled, false),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
+    value ? like(schema.user.className, `${value}%`) : undefined,
+  )
 }
 
 /**

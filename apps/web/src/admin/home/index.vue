@@ -7,8 +7,8 @@ import { Bar } from 'vue-chartjs'
 import { useChartTheme } from 'shared/composables/chartTheme'
 import { rgba } from 'shared/composables/tone'
 import PageHeader from 'admin/components/PageHeader.vue'
-import { classLabel, groupClassOptions } from 'utils/classes'
-import { useConfigStore } from 'shared/store/config'
+import ClassSelect from 'shared/components/ClassSelect.vue'
+import { classLabel } from 'utils/classes'
 import { useUserStore } from 'shared/store/user'
 import { SubmissionStatus } from 'utils/constants'
 import { getBaseInfo, randomUser10 } from '../api'
@@ -29,7 +29,6 @@ const theme = useThemeVars()
 const { chartKey } = useChartTheme()
 const router = useRouter()
 const userStore = useUserStore()
-const configStore = useConfigStore()
 
 const info = ref<DashboardInfo | null>(null)
 onMounted(async () => {
@@ -100,7 +99,6 @@ const shortcuts = [
 
 // ---------------------------------------------------------------- 抽一个人
 
-const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 const luckyClass = ref<string | null>(null)
 const luckyGuy = ref('')
 const isRolling = ref(false)
@@ -210,7 +208,8 @@ onUnmounted(stopRolling)
 
   <div class="lucky">
     <b class="lucky-title">抽签</b>
-    <n-select v-model:value="luckyClass" :options="classOptions" filterable placeholder="选班级" aria-label="班级" class="lucky-select" />
+    <!-- 抽签是在教室里点人，没填班级的两百多个号不在一间教室 -->
+    <ClassSelect v-model:value="luckyClass" :no-class="false" aria-label="班级" class="lucky-select" />
     <span :key="pulseKey" class="lucky-name" :class="{ pulse: !isRolling && luckyGuy }">
       {{ luckyGuy }}
     </span>

@@ -1,5 +1,6 @@
 import {
   joinProblemSetRequestSchema,
+  NO_CLASS,
   STUDENT_ROLES,
   type ProblemSet,
   type ProblemSetBadge,
@@ -19,7 +20,7 @@ import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
 import { JudgeStatus, NON_FAILURE_RESULTS } from '../judge/status'
 import { assigningSql, computeProgress, problemSetLockCutoffs, problemSetLocksFor } from '../services/problemset'
-import { asRecord, isTeacherOrAbove, queryInteger, sampleUser } from './helpers'
+import { asRecord, isTeacherOrAbove, queryInteger, rosterCondition, sampleUser } from './helpers'
 
 export const problemsetRoutes = new Hono<AppEnv>()
 
@@ -445,7 +446,7 @@ problemsetRoutes.get('/users/:username/badges', optionalAuth, async (c) => {
  *
  * 班级不用老师选：从加入过的学生里数出有哪些班，最近有人加入的排第一个、默认就看它，
  * 想看别的班再换（和比赛「全班情况」按参赛者推断班级是一个思路）。名单是那个班的全部学生，
- * 没加入的也列出来，好点名。
+ * 没加入的也列出来，好点名（「没填班级」那组不是真班，只列加入了的）。
  */
 problemsetRoutes.get('/problem-sets/:id/class-view', requireTeacher, async (c) => {
   const found = await loadVisible(queryInteger(c.req.param('id'), 0, { min: 1 }), c.get('user'))
@@ -466,13 +467,14 @@ problemsetRoutes.get('/problem-sets/:id/class-view', requireTeacher, async (c) =
       .orderBy(asc(schema.problemsetProblem.order), asc(schema.problemsetProblem.id)),
     db
       .select({
-        className: sql<string>`${schema.user.className}`,
+        // 没填班级的人合成一组，叫 NO_CLASS，和别的下拉同一个值
+        className: sql<string>`coalesce(${schema.user.className}, ${NO_CLASS})`,
         joined: count(),
         last: sql<string>`max(${schema.problemsetProgress.joinTime})`,
       })
       .from(schema.problemsetProgress)
       .innerJoin(schema.user, eq(schema.user.id, schema.problemsetProgress.userId))
-      .where(and(eq(schema.problemsetProgress.problemsetId, id), studentRole, sql`coalesce(${schema.user.className}, '') <> ''`))
+      .where(and(eq(schema.problemsetProgress.problemsetId, id), studentRole, sql`${schema.user.className} is distinct from ''`))
       .groupBy(schema.user.className)
       .orderBy(sql`max(${schema.problemsetProgress.joinTime}) desc`),
   ])
@@ -501,7 +503,7 @@ problemsetRoutes.get('/problem-sets/:id/class-view', requireTeacher, async (c) =
       joined: row.joined,
       size: sizeOf.get(row.className) ?? row.joined,
     }))
-    .map((row, recency) => ({ row, recency, doing: row.joined >= 5 && row.joined * 3 >= row.size }))
+    .map((row, recency) => ({ row, recency, doing: row.className !== NO_CLASS && row.joined >= 5 && row.joined * 3 >= row.size }))
     .sort((a, b) => (a.doing !== b.doing ? Number(b.doing) - Number(a.doing) : a.doing ? a.recency - b.recency : b.row.joined - a.row.joined))
     .map((item) => item.row)
   const wanted = c.req.query('className')?.trim()
@@ -532,7 +534,12 @@ problemsetRoutes.get('/problem-sets/:id/class-view', requireTeacher, async (c) =
     .from(schema.user)
     .leftJoin(schema.userProfile, eq(schema.userProfile.userId, schema.user.id))
     .leftJoin(schema.problemsetProgress, and(eq(schema.problemsetProgress.userId, schema.user.id), eq(schema.problemsetProgress.problemsetId, id)))
-    .where(and(eq(schema.user.className, className), studentRole, eq(schema.user.isDisabled, false)))
+    .where(
+      rosterCondition(
+        className,
+        db.select({ id: schema.problemsetProgress.userId }).from(schema.problemsetProgress).where(eq(schema.problemsetProgress.problemsetId, id)),
+      ),
+    )
     .orderBy(asc(schema.user.username))
   if (roster.length === 0) return success(c, empty)
   const userIds = roster.map((row) => row.userId)

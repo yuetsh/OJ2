@@ -25,7 +25,7 @@ import { db, schema } from '../db'
 import { failure, parseBody, success } from '../http'
 import { suggestActiveClass } from '../services/class-activity'
 import { buildReview, cleanEdits, editsError, passes, runTraining, selectItems, splitItems } from '../services/model-training'
-import { queryInteger } from './helpers'
+import { queryInteger, rosterCondition } from './helpers'
 
 export const modelTrainingRoutes = new Hono<AppEnv>()
 
@@ -258,7 +258,12 @@ modelTrainingRoutes.get('/model-trainings/:id/progress', requireTeacher, async (
     ? await db
         .select({ id: schema.user.id, username: schema.user.username, className: schema.user.className })
         .from(schema.user)
-        .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
+        .where(
+          rosterCondition(
+            className,
+            db.select({ id: schema.modelTrainingWork.userId }).from(schema.modelTrainingWork).where(eq(schema.modelTrainingWork.modelTrainingId, lesson.id)),
+          ),
+        )
         .orderBy(asc(schema.user.username))
     : []
   const ids = students.map((s) => s.id)

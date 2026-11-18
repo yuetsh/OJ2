@@ -15,8 +15,8 @@ import { PROBLEM_PERMISSION, USER_TYPE } from 'utils/constants'
 import { useRouteQuery } from '@vueuse/router'
 import { legacyClassOf, NO_CLASS, STUDENT_ROLES, type ImportUsersRequest } from '@oj2/contract'
 import { downloadAccountsCsv } from './accountsCsv'
-import { classLabel, groupClassOptions } from 'utils/classes'
-import { useConfigStore } from 'shared/store/config'
+import ClassSelect from 'shared/components/ClassSelect.vue'
+import { classLabel } from 'utils/classes'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useListLoader } from 'shared/composables/listLoader'
 
@@ -27,7 +27,6 @@ import { useListLoader } from 'shared/composables/listLoader'
  */
 const message = useMessage()
 const theme = useThemeVars()
-const configStore = useConfigStore()
 const { isMobile } = useBreakpoints()
 
 interface UserQuery {
@@ -45,15 +44,6 @@ const { query, clearQuery } = usePagination<UserQuery>({
   className: useRouteQuery('className', '').value,
 })
 
-const classOptions = computed(() => [
-  { label: '全部班级', value: '' },
-  ...groupClassOptions(configStore.config?.classList ?? []),
-  { label: classLabel(NO_CLASS), value: NO_CLASS },
-])
-/** 编辑框的班级：配置里的班，外加这个人现在的班（老班不在配置里也要显示得出来） */
-const editClassOptions = computed(() =>
-  groupClassOptions([...(configStore.config?.classList ?? []), ...(userEditing.value?.className ? [userEditing.value.className] : [])]),
-)
 const neverLoggedIn = ref(0)
 
 const total = ref(0)
@@ -371,7 +361,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
     </template>
     <template #filters>
       <n-input :style="{ width: isMobile ? '100%' : '220px' }" v-model:value="query.keyword" placeholder="用户名或名字" clearable @clear="clearQuery" />
-      <n-select v-model:value="query.className" :options="classOptions" filterable aria-label="班级" style="width: 150px" />
+      <ClassSelect v-model:value="query.className" all aria-label="班级" style="width: 150px" />
       <n-button v-if="query.className && query.className !== NO_CLASS" :loading="downloadingClass" @click="downloadClassAccounts">
         <template #icon><Icon icon="ph:download-simple" /></template>
         下载这个班的账号
@@ -405,7 +395,7 @@ watch(() => [query.page, query.limit, query.type, query.orderBy, query.className
         </n-form-item-gi>
         <!-- 班级单独存一列，2026-11 起不再从用户名的 ks 前缀推（新号不带前缀）。老师、管理员不填 -->
         <n-form-item-gi :span="1" label="班级">
-          <n-select v-model:value="userEditing.className" :options="editClassOptions" filterable clearable placeholder="没填班级" />
+          <ClassSelect v-model:value="userEditing.className" :no-class="false" clearable placeholder="没填班级" />
         </n-form-item-gi>
         <n-form-item-gi :span="1" label="邮箱">
           <n-input v-model:value="userEditing.email" />

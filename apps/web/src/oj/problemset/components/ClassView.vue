@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { displayName } from '@oj2/contract'
+import { displayName, NO_CLASS } from '@oj2/contract'
 import { useThemeVars } from 'naive-ui'
 import { getProblemSetClassView } from 'oj/api'
 import { useTone } from 'shared/composables/tone'
-import { classLabel, groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
+import { classLabel } from 'utils/classes'
 import UserName from 'shared/components/UserName.vue'
 import { parseTime } from 'utils/functions'
 import type { ProblemSetClassView } from 'utils/types'
@@ -37,13 +38,13 @@ watch(className, (value, old) => {
   if (old && value !== data.value?.className) load()
 })
 
-const classOptions = computed(() => {
-  const classes = new Map((data.value?.classes ?? []).map((item) => [item.className, item]))
-  return groupClassOptions([...classes.keys()], (name) => {
-    const item = classes.get(name)!
-    return { value: name, label: `${classLabel(name)}（${item.joined}/${item.size} 人加入）` }
-  })
-})
+// 候选只有加入过的班；没填班级的那组（NO_CLASS）后端只在有人加入时才给，名单只列加入了的，所以不写「/总人数」
+const classes = computed(() => new Map((data.value?.classes ?? []).map((item) => [item.className, item])))
+function classOptionLabel(name: string) {
+  const item = classes.value.get(name)
+  if (!item) return classLabel(name)
+  return name === NO_CLASS ? `${classLabel(name)}（${item.joined} 人加入）` : `${classLabel(name)}（${item.joined}/${item.size} 人加入）`
+}
 
 const joined = computed(() => data.value?.students.filter((s) => s.joinTime) ?? [])
 const absent = computed(() => data.value?.students.filter((s) => !s.joinTime) ?? [])
@@ -73,7 +74,15 @@ const error = computed(() => tone('error'))
     <div v-if="data && !data.className" class="empty muted">还没有学生加入这个专题</div>
     <template v-else-if="data">
       <div class="summary">
-        <n-select v-model:value="className" :options="classOptions" size="small" class="pick" :consistent-menu-width="false" />
+        <ClassSelect
+          v-model:value="className"
+          :classes="[...classes.keys()]"
+          :no-class="false"
+          :label="classOptionLabel"
+          size="small"
+          class="pick"
+          :consistent-menu-width="false"
+        />
         <span
           ><b class="num big">{{ joined.length }}</b
           ><span class="muted"> / {{ data.students.length }} 人加入</span></span

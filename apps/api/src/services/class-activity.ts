@@ -3,6 +3,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm
 
 import { db, schema } from '../db'
 import { JudgeStatus } from '../judge/status'
+import { classCondition } from '../routes/helpers'
 
 /**
  * 课堂上「谁做了哪道题」的取数口径：课堂条、任务页、自学情况、后台首页「正在上课的班」
@@ -19,12 +20,12 @@ export const SOLVED_RESULTS = [JudgeStatus.ACCEPTED, JudgeStatus.AST_CHECK_FAILE
  */
 export const FLOWCHART_PASSED = and(eq(schema.flowchartSubmission.status, 2), inArray(schema.flowchartSubmission.aiGrade, [...FLOWCHART_PASS_GRADES]))!
 
-/** 这个班正常状态的学生，给下面的查询当 `user_id in (...)` 用 */
+/** 这个班正常状态的学生，给下面的查询当 `user_id in (...)` 用；班级口径同 classCondition（认 NO_CLASS） */
 export function classMemberIds(className: string) {
   return db
     .select({ id: schema.user.id })
     .from(schema.user)
-    .where(and(eq(schema.user.className, className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
+    .where(and(classCondition(className), eq(schema.user.isDisabled, false), inArray(schema.user.adminType, [...STUDENT_ROLES])))
 }
 
 /**

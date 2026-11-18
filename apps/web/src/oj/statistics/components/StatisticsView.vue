@@ -3,10 +3,9 @@ import { Icon } from '@iconify/vue'
 import { useThemeVars } from 'naive-ui'
 import { NO_CLASS, type FlowchartStatistics, type SubmissionLessons, type SubmissionStatistics, type SubmissionStatisticsGrid } from '@oj2/contract'
 import { getFlowchartStatistics, getSubmissionLessons, getSubmissionStatistics, getSubmissionStatisticsGrid } from 'oj/api'
-import { useConfigStore } from 'shared/store/config'
 import { fromPickerValue, toPickerValue } from 'utils/functions'
 import { useTone } from 'shared/composables/tone'
-import { classSelectOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, dayStartOfDate, periodRange, type Period } from '../period'
 import { resultName, useResultColor } from '../results'
 import ByClass from './ByClass.vue'
@@ -45,7 +44,6 @@ const emit = defineEmits<{
   list: [query: Record<string, string>]
 }>()
 
-const configStore = useConfigStore()
 const theme = useThemeVars()
 const tone = useTone()
 const resultColor = useResultColor()
@@ -102,8 +100,6 @@ function pickDates(value: [number, number] | null) {
 
 /** 学生框：包含匹配。班级另外单独传（按 class_name 精确匹配，见后端 scopedUsers） */
 const studentParam = computed(() => username.value.trim())
-
-const classOptions = computed(() => classSelectOptions(configStore.config?.classList ?? [], className.value))
 
 // ---------- 取数 ----------
 
@@ -332,16 +328,7 @@ function resultWidth(value: number) {
         <n-radio-button value="flow">流程图</n-radio-button>
       </n-radio-group>
       <span class="vsep"></span>
-      <n-select
-        :value="className || null"
-        class="w-class"
-        size="small"
-        :options="classOptions"
-        placeholder="全部班级"
-        clearable
-        filterable
-        @update:value="(v: string | null) => (className = v ?? '')"
-      />
+      <ClassSelect v-model:value="className" all class="w-class" size="small" />
       <n-input v-model:value="username" class="w-user" size="small" clearable placeholder="学生">
         <template #prefix><Icon icon="ph:magnifying-glass" /></template>
       </n-input>

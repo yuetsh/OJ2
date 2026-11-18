@@ -5,7 +5,7 @@ import type { LabelingProgress } from '@oj2/contract'
 import UserName from 'shared/components/UserName.vue'
 import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { getLabeling, getLabelingProgress } from 'oj/api'
 import BoxView from './components/BoxView.vue'
 import LabelingImage from './components/LabelingImage.vue'
@@ -23,6 +23,8 @@ const route = useRoute()
 const router = useRouter()
 const message = useMessage()
 const configStore = useConfigStore()
+/** 候选班：做过这一节的班在前，再是配置里的班 */
+const classes = computed(() => [...(progress.value?.classes ?? []), ...(configStore.config?.classList ?? [])])
 
 const labelingId = computed(() => Number(props.labelingID))
 const title = ref('')
@@ -39,18 +41,14 @@ const itemCount = computed(() => progress.value?.items.length ?? 0)
 const marking = computed(() => progress.value?.kind === 'span' || progress.value?.kind === 'box')
 const shownDone = computed(() => (showAllDone.value ? people.value!.done : people.value!.done.slice(0, 8)))
 
-const classOptions = computed(() => {
-  const list = [...(progress.value?.classes ?? []), ...(configStore.config?.classList ?? [])]
-  return groupClassOptions(className.value ? [className.value, ...list] : list)
-})
-
 async function load() {
   const data = await getLabelingProgress(labelingId.value, className.value)
   progress.value = data
   className.value = data.className
 }
 
-function changeClass(value: string) {
+function changeClass(value: string | null) {
+  if (!value) return
   className.value = value
   router.replace({ query: { ...route.query, className: value } })
   load().catch((err) => message.error(errorMessage(err)))
@@ -92,7 +90,7 @@ onMounted(async () => {
       <span class="grow"></span>
       <label class="classPick">
         <span class="sec">班级</span>
-        <n-select :value="className" :options="classOptions" placeholder="选择班级" filterable class="classSelect" @update:value="changeClass" />
+        <ClassSelect :value="className" :classes="classes" placeholder="选择班级" class="classSelect" @update:value="changeClass" />
       </label>
       <n-button @click="router.push({ name: 'admin labeling edit', params: { labelingID } })">编辑这一节</n-button>
     </div>

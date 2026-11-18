@@ -1,6 +1,6 @@
 import { ADMIN_ROLES, NO_CLASS, STUDENT_ROLES, TEACHER_ROLES, type SampleUser } from '@oj2/contract'
 
-import { and, count, eq, inArray, isNull, notInArray } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, notInArray, type SQLWrapper } from 'drizzle-orm'
 
 import type { AuthUser } from '../auth/session'
 import { db, schema } from '../db'
@@ -154,6 +154,20 @@ export async function countFailedSubmissions(userId: number, problemId: number) 
  */
 export function classCondition(className: string) {
   return className === NO_CLASS ? and(isNull(schema.user.className), inArray(schema.user.adminType, [...STUDENT_ROLES])) : eq(schema.user.className, className)
+}
+
+/**
+ * 进度页的「全班名单」：这个班没停用的学生。NO_CLASS 不是真班 —— 两百多个号里大多是自己注册、
+ * 早就不来的，全列出来「还没开始」那一栏全是不相干的人 —— 所以只列 `done`（做过这一节的人的
+ * user_id 子查询）里的人，和统计那边「没填班级不列还没交」同一个口径。
+ */
+export function rosterCondition(className: string, done: SQLWrapper) {
+  return and(
+    classCondition(className),
+    eq(schema.user.isDisabled, false),
+    inArray(schema.user.adminType, [...STUDENT_ROLES]),
+    className === NO_CLASS ? inArray(schema.user.id, done) : undefined,
+  )
 }
 
 /**

@@ -8,9 +8,9 @@ import Pagination from 'shared/components/Pagination.vue'
 import { useBreakpoints } from 'shared/composables/breakpoints'
 import { useListLoader } from 'shared/composables/listLoader'
 import { usePagination } from 'shared/composables/pagination'
-import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
-import { classLabel, groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
+import { classLabel } from 'utils/classes'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
 import { deleteAdminLesson, getAdminLessons } from '../api'
@@ -23,7 +23,6 @@ import LessonEditModal from './components/LessonEditModal.vue'
 const router = useRouter()
 const message = useMessage()
 const theme = useThemeVars()
-const configStore = useConfigStore()
 const { isMobile } = useBreakpoints()
 
 // 从任务页「布置过的课」进来带着 ?className=
@@ -34,7 +33,6 @@ const { query } = usePagination<{ className: string; teacher: string; mode: stri
 })
 const data = ref<AdminLessonList | null>(null)
 
-const classOptions = computed(() => [{ label: '全部班级', value: '' }, ...groupClassOptions(configStore.config?.classList ?? [])])
 const MODES: LessonMode[] = ['code', 'both', 'flowchart']
 const modeOptions = [{ label: '全部做法', value: '' }, ...MODES.map((value) => ({ label: LESSON_MODE_LABEL[value], value }))]
 const teacherOptions = computed(() => [
@@ -182,7 +180,8 @@ const columns = computed(() => (isMobile.value ? mobileColumns : desktopColumns)
       <n-button type="primary" @click="edit(null)">补一节</n-button>
     </template>
     <template #filters>
-      <n-select v-model:value="query.className" :options="classOptions" filterable aria-label="班级" :style="{ width: isMobile ? '100%' : '160px' }" />
+      <!-- 布置作业只能给真班，「没填班级」在这里永远是空的 -->
+      <ClassSelect v-model:value="query.className" all :no-class="false" aria-label="班级" :style="{ width: isMobile ? '100%' : '160px' }" />
       <n-select v-model:value="query.teacher" :options="teacherOptions" aria-label="老师" :style="{ width: isMobile ? '100%' : '140px' }" />
       <n-select v-model:value="query.mode" :options="modeOptions" aria-label="做什么" :style="{ width: isMobile ? '100%' : '120px' }" />
     </template>

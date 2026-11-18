@@ -2,9 +2,8 @@
 import { Icon } from '@iconify/vue'
 import { LESSON_MODE_LABEL, lessonNeeds, type AdminLesson, type LessonLanguage, type LessonMode } from '@oj2/contract'
 import ProblemPicker from 'oj/task/components/ProblemPicker.vue'
-import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { LANGUAGE_SHOW_VALUE } from 'utils/constants'
 import { parseTime } from 'utils/functions'
 import { createAdminLesson, updateAdminLesson } from '../../api'
@@ -20,12 +19,10 @@ const props = defineProps<{
 const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{ saved: [] }>()
 const message = useMessage()
-const configStore = useConfigStore()
 
 const LESSON_LANGUAGES: LessonLanguage[] = ['Python', 'C', 'C++', 'SQL']
 const languageOptions = LESSON_LANGUAGES.map((value) => ({ label: LANGUAGE_SHOW_VALUE[value], value }))
 const modeOptions = (['code', 'both', 'flowchart'] as const).map((value) => ({ label: LESSON_MODE_LABEL[value], value }))
-const classOptions = computed(() => groupClassOptions(configStore.config?.classList ?? []))
 
 const className = ref<string | null>(null)
 const day = ref<string | null>(null)
@@ -98,7 +95,7 @@ async function save() {
   <n-modal v-model:show="show" preset="card" :title="lesson ? '改这一节' : '补一节'" :bordered="false" :style="{ width: 'min(520px, calc(100vw - 32px))' }">
     <n-form label-placement="left" label-width="64">
       <n-form-item label="班级">
-        <n-select v-model:value="className" :options="classOptions" filterable placeholder="选班级" />
+        <ClassSelect v-model:value="className" :no-class="false" />
       </n-form-item>
       <n-form-item label="上课">
         <div class="when">

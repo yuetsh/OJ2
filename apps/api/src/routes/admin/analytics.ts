@@ -16,7 +16,7 @@
  * problem.ts 先注册的 `/problems/:id` 会把它整个吃掉（以前真发生过，见 git 历史）。
  */
 
-import { STUDENT_ROLES, type StuckProblem, type StuckProblemDetail, type GradeTrend } from '@oj2/contract'
+import { NO_CLASS, STUDENT_ROLES, type StuckProblem, type StuckProblemDetail, type GradeTrend } from '@oj2/contract'
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import { Hono } from 'hono'
 
@@ -65,11 +65,11 @@ function studentSubmissions(where: SQL[]) {
   `
 }
 
-/** 班级精确匹配、时间段只留「在这段时间里交过」的人题对（第一次交在不在段里由 having 再卡） */
+/** 班级精确匹配（NO_CLASS 是没填班级的学生，上面已经只圈学生）、时间段只留「在这段时间里交过」的人题对（第一次交在不在段里由 having 再卡） */
 function scope(className: string | undefined, start: string | null, problemId?: number) {
   const where: SQL[] = []
   if (problemId) where.push(sql`s.problem_id = ${problemId}`)
-  if (className) where.push(sql`u.class_name = ${className}`)
+  if (className) where.push(className === NO_CLASS ? sql`u.class_name is null` : sql`u.class_name = ${className}`)
   if (start)
     where.push(sql`(s.user_id, s.problem_id) in (
       select user_id, problem_id from ${schema.submission}

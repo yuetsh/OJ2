@@ -6,7 +6,7 @@ import CodeEditor from 'shared/components/CodeEditor.vue'
 import UserName from 'shared/components/UserName.vue'
 import { useConfigStore } from 'shared/store/config'
 import { errorMessage } from 'utils/api'
-import { groupClassOptions } from 'utils/classes'
+import ClassSelect from 'shared/components/ClassSelect.vue'
 import { parseTime } from 'utils/functions'
 import { getDataAnalysis, getDataAnalysisProgress, getDataAnalysisStudentWork, runDataAnalysisStudentStep } from 'oj/api'
 import DataAnalysisOutputs from './components/DataAnalysisOutputs.vue'
@@ -33,13 +33,11 @@ const className = ref<string | null>(typeof route.query.className === 'string' ?
 const openGroups = ref(new Set<string>())
 const selectedId = ref<number | null>(null)
 
+/** 候选班：做过这一节的班在前，再是配置里的班 */
+const classes = computed(() => [...(progress.value?.classes ?? []), ...(configStore.config?.classList ?? [])])
+
 const groups = computed(() => (progress.value ? groupProgress(progress.value) : []))
 const total = computed(() => progress.value?.students.length ?? 0)
-
-const classOptions = computed(() => {
-  const list = [...(progress.value?.classes ?? []), ...(configStore.config?.classList ?? [])]
-  return groupClassOptions(className.value ? [className.value, ...list] : list)
-})
 
 function groupTitle(g: ProgressGroup) {
   if (g.kind === 'done') return '全部做对'
@@ -68,7 +66,8 @@ async function load(first = false) {
   }
 }
 
-function changeClass(value: string) {
+function changeClass(value: string | null) {
+  if (!value) return
   className.value = value
   router.replace({ query: { ...route.query, className: value } })
   selectedId.value = null
@@ -167,7 +166,7 @@ onMounted(async () => {
       <span class="grow"></span>
       <label class="classPick">
         <span class="sec">班级</span>
-        <n-select :value="className" :options="classOptions" placeholder="选择班级" filterable class="classSelect" @update:value="changeClass" />
+        <ClassSelect :value="className" :classes="classes" placeholder="选择班级" class="classSelect" @update:value="changeClass" />
       </label>
       <n-button @click="router.push({ name: 'admin data analysis edit', params: { dataAnalysisID } })">编辑这一节</n-button>
     </div>

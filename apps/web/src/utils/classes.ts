@@ -13,7 +13,7 @@ export function classLabel(className: string | null) {
 type ClassOption = { label: string; value: string }
 
 /**
- * 全站的班级下拉都按年级分组：「25 级」底下列 251、252……，新的年级在上，组里按班号排
+ * 全站的班级下拉（shared/components/ClassSelect.vue）都按年级分组：「25 级」底下列 251、252……，新的年级在上，组里按班号排
  * （11 班排在 2 班后面）。年级是班号前两位，和排名的「本年级」同一个口径。
  * `first` 给了就把那个年级提到最前（班级 PK 加班时先给同年级的）。
  * `toOption` 换掉选项长相（专题的「n/m 人加入」、登录框的 ks 前缀）；不是数字班号的
@@ -43,13 +43,4 @@ export function groupClassOptions<T extends ClassOption = ClassOption>(
       children: list.sort((a, b) => a.localeCompare(b, 'zh', { numeric: true })).map(toOption),
     }))
   return [...grouped, ...rest.map(toOption)]
-}
-
-/**
- * 班级下拉的选项：配置里的班按年级分组，最后一项「没填班级」（这批号也要能和普通班一样
- * 圈出来看）。带进来的班不在配置里（老班、手打的）也要显示得出来，不然框里是空的却在筛
- */
-export function classSelectOptions(list: string[], current: string) {
-  const all = current && current !== NO_CLASS ? [current, ...list] : list
-  return [...groupClassOptions(all), { label: classLabel(NO_CLASS), value: NO_CLASS }]
 }
