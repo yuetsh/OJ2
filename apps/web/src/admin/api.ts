@@ -907,3 +907,37 @@ export function uploadLabelingImage(id: number, file: Blob) {
   form.append('file', file, 'image.jpg')
   return api.post<AdminLabelingItem>(`admin/labelings/${id}/images`, form)
 }
+
+// ---------- 训练模型（model-training） ----------
+
+import type {
+  AdminModelTraining,
+  AdminModelTrainingListItem,
+  CreateModelTrainingRequest,
+  ReorderModelTrainingsRequest,
+  SaveModelTrainingRequest,
+} from '@oj2/contract'
+
+export function getAdminModelTrainings() {
+  return api.get<AdminModelTrainingListItem[]>('admin/model-trainings')
+}
+
+export function reorderAdminModelTrainings(ids: number[]) {
+  return api.put<null>('admin/model-training-order', { ids } satisfies ReorderModelTrainingsRequest)
+}
+
+export function getAdminModelTraining(id: number) {
+  return api.get<AdminModelTraining>(`admin/model-trainings/${id}`)
+}
+
+export function createAdminModelTraining(title: string) {
+  return api.post<AdminModelTraining>('admin/model-trainings', { title } satisfies CreateModelTrainingRequest)
+}
+
+export function saveAdminModelTraining(id: number, body: SaveModelTrainingRequest) {
+  return api.put<AdminModelTraining>(`admin/model-trainings/${id}`, body)
+}
+
+export function deleteAdminModelTraining(id: number) {
+  return api.delete<null>(`admin/model-trainings/${id}`)
+}

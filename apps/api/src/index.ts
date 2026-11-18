@@ -22,6 +22,7 @@ import { problemStatsRoutes } from './routes/problem-stats'
 import { submissionRoutes } from './routes/submission'
 import { dataAnalysisRoutes } from './routes/data-analysis'
 import { labelingRoutes } from './routes/labeling'
+import { modelTrainingRoutes } from './routes/model-training'
 import { trialRunRoutes } from './routes/trial-run'
 import { mascotRoutes } from './routes/mascot'
 import { siteRoutes } from './routes/site'
@@ -49,6 +50,7 @@ app.route('/api', submissionRoutes)
 app.route('/api', trialRunRoutes)
 app.route('/api', dataAnalysisRoutes)
 app.route('/api', labelingRoutes)
+app.route('/api', modelTrainingRoutes)
 app.route('/api', mascotRoutes)
 app.route('/api/admin', adminRoutes)
 

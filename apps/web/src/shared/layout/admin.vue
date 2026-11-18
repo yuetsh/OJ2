@@ -84,6 +84,13 @@ const NAV: NavGroup[] = [
         role: 'teacher',
       },
       {
+        label: '训练模型',
+        icon: 'ph:brain',
+        path: '/admin/model-training',
+        to: '/admin/model-training/list',
+        role: 'teacher',
+      },
+      {
         label: '数据分析',
         icon: 'ph:chart-bar',
         path: '/admin/data-analysis',

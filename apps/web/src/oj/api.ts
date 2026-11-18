@@ -651,3 +651,31 @@ export function labelingImageUrl(id: number, itemId: number) {
 export function getLabelingProgress(id: number, className?: string | null) {
   return api.get<LabelingProgress>(`labelings/${id}/progress`, { params: { className: className ?? '' } })
 }
+
+// ---------- 训练模型（model-training） ----------
+
+import type { ModelTrainingDetail, ModelTrainingEdits, ModelTrainingListItem, ModelTrainingProgress, SaveModelTrainingEditsRequest } from '@oj2/contract'
+
+export function getModelTrainings() {
+  return api.get<ModelTrainingListItem[]>('model-trainings')
+}
+
+export function getModelTraining(id: number) {
+  return api.get<ModelTrainingDetail>(`model-trainings/${id}`)
+}
+
+export function saveModelTrainingWork(id: number, edits: ModelTrainingEdits) {
+  return api.put<null>(`model-trainings/${id}/work`, { edits } satisfies SaveModelTrainingEditsRequest)
+}
+
+export function trainModelTraining(id: number, edits: ModelTrainingEdits) {
+  return api.post<ModelTrainingDetail>(`model-trainings/${id}/train`, { edits } satisfies SaveModelTrainingEditsRequest)
+}
+
+export function resetModelTraining(id: number) {
+  return api.post<null>(`model-trainings/${id}/reset`)
+}
+
+export function getModelTrainingProgress(id: number, className?: string | null) {
+  return api.get<ModelTrainingProgress>(`model-trainings/${id}/progress`, { params: { className: className ?? '' } })
+}

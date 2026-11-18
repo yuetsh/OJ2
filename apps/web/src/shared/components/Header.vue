@@ -108,11 +108,13 @@ const navLinks = computed<NavLink[]>(() =>
 
 /**
  * 排在最后的「实验室」：点开是下拉，放不是天天做题的新玩法（2026-11-12 用户要的）。
- * 数据标注排在数据分析前面：不用写代码、门槛低，也是数据处理流程里先做的那步。
+ * 按门槛从低到高排：数据标注（不用写代码）→ 训练模型（不写代码，但要看懂准确率）→ 数据分析（写 pandas），
+ * 也正好是数据处理流程里的先后。
  * key 同样是一级路径，下拉里任一项是当前页时「实验室」亮着。
  */
 const labLinks: NavLink[] = [
   { key: 'labeling', label: '数据标注', to: '/labeling' },
+  { key: 'model-training', label: '训练模型', to: '/model-training' },
   { key: 'data-analysis', label: '数据分析', to: '/data-analysis' },
 ]
 const labMenu: DropdownOption[] = labLinks.map((link) => ({ label: link.label, key: link.key }))

@@ -53,6 +53,8 @@ import type {
   LessonLanguage,
   LessonMode,
   MascotEventKind,
+  ModelTrainingEdits,
+  ModelTrainingSplit,
   ProblemChallenges,
   ProblemDifficulty,
   ProblemLanguage,
@@ -1732,6 +1734,145 @@ export const labelingAnswer = pgTable(
       columns: [table.labelingId],
       foreignColumns: [labeling.id],
       name: 'labeling_answer_labeling_id_fk_labeling_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 「训练模型」的一节（代码里叫 model_training），设计见 docs/specs/2026-11-17-model-training-lab-design.md。
+ * 实验室板块、试验性质：下面四张表只被这个板块用，别的表不外键指向它们，下线就是一份 drop 迁移。
+ * `labels` 是这一节的标签；`threshold` 是达标线（百分比，看「最后考」）；`review` 是达标后给学生看的一段话。
+ */
+export const modelTraining = pgTable(
+  'model_training',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'model_training_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    title: varchar({ length: 128 }).notNull(),
+    description: text().default('').notNull(),
+    review: text().default('').notNull(),
+    labels: jsonb().$type<string[]>().default([]).notNull(),
+    threshold: integer().default(80).notNull(),
+    isPublic: boolean('is_public').default(false).notNull(),
+    /** 后台拖动排的先后；新建的排最后 */
+    order: integer().default(0).notNull(),
+    createdById: integer('created_by_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    // 出题人：删用户要拦住，和另外两个实验室一样
+    foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [user.id],
+      name: 'model_training_created_by_id_fk_user_id',
+    }),
+  ],
+)
+
+/**
+ * 一条数据。`split`：train 训练 / practice 练习测试 / final 最后考。
+ * `shown` 是给学生看的标签，只有训练数据有；和 `answer` 不一样的就是老师故意标错的。
+ */
+export const modelTrainingItem = pgTable(
+  'model_training_item',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'model_training_item_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    modelTrainingId: integer('model_training_id').notNull(),
+    order: integer().notNull(),
+    split: text().$type<ModelTrainingSplit>().notNull(),
+    text: text().notNull(),
+    shown: text(),
+    answer: text().notNull(),
+  },
+  (table) => [
+    index('model_training_item_model_training_id_idx').on(table.modelTrainingId, table.order),
+    foreignKey({
+      columns: [table.modelTrainingId],
+      foreignColumns: [modelTraining.id],
+      name: 'model_training_item_model_training_id_fk_model_training_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
+ * 学生 × 一节一行：改了什么（存改动不存整份）、上一次训练时的改动、最高分、第一次达标的时间。
+ * `best` 是最后考的最高准确率（百分比，往下取整）。达标了就不撤销（设计文档第 2 节第 10 条）。
+ */
+export const modelTrainingWork = pgTable(
+  'model_training_work',
+  {
+    userId: integer('user_id').notNull(),
+    modelTrainingId: integer('model_training_id').notNull(),
+    edits: jsonb().$type<ModelTrainingEdits>().notNull(),
+    trainedEdits: jsonb('trained_edits').$type<ModelTrainingEdits>(),
+    best: integer(),
+    passedAt: timestamp('passed_at', { withTimezone: true, mode: 'string' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.modelTrainingId], name: 'model_training_work_pkey' }),
+    index('model_training_work_model_training_id_idx').on(table.modelTrainingId),
+    // 和 labeling_answer 同一档：账号、这一节没了，这些记录就没意义
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: 'model_training_work_user_id_fk_user_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.modelTrainingId],
+      foreignColumns: [modelTraining.id],
+      name: 'model_training_work_model_training_id_fk_model_training_id',
+    }).onDelete('cascade'),
+  ],
+)
+
+/** 每训练一次一行：两份测试各判对几条（「62% → 71% → 86%」、训练几次）。存当时的条数，老师后来增删不影响 */
+export const modelTrainingRun = pgTable(
+  'model_training_run',
+  {
+    id: integer().primaryKey().generatedByDefaultAsIdentity({
+      name: 'model_training_run_id_seq',
+      startWith: 1,
+      increment: 1,
+      minValue: 1,
+      maxValue: 2147483647,
+      cache: 1,
+    }),
+    userId: integer('user_id').notNull(),
+    modelTrainingId: integer('model_training_id').notNull(),
+    practiceCorrect: integer('practice_correct').notNull(),
+    practiceTotal: integer('practice_total').notNull(),
+    finalCorrect: integer('final_correct').notNull(),
+    finalTotal: integer('final_total').notNull(),
+    passed: boolean().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [
+    index('model_training_run_model_training_id_user_id_idx').on(table.modelTrainingId, table.userId),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [user.id],
+      name: 'model_training_run_user_id_fk_user_id',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.modelTrainingId],
+      foreignColumns: [modelTraining.id],
+      name: 'model_training_run_model_training_id_fk_model_training_id',
     }).onDelete('cascade'),
   ],
 )

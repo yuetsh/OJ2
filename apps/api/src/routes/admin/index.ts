@@ -11,6 +11,7 @@ import { adminDataAnalysisRoutes } from './data-analysis'
 import { adminLabelingRoutes } from './labeling'
 import { adminLearnRoutes } from './learn'
 import { adminLessonRoutes } from './lesson'
+import { adminModelTrainingRoutes } from './model-training'
 import { adminProblemRoutes } from './problem'
 import { adminProblemSetRoutes } from './problemset'
 import { adminTagRoutes } from './tag'
@@ -37,6 +38,7 @@ adminRoutes.route('/', adminDataAnalysisRoutes)
 adminRoutes.route('/', adminLabelingRoutes)
 adminRoutes.route('/', adminLearnRoutes)
 adminRoutes.route('/', adminLessonRoutes)
+adminRoutes.route('/', adminModelTrainingRoutes)
 adminRoutes.route('/', adminProblemRoutes)
 adminRoutes.route('/', adminProblemSetRoutes)
 adminRoutes.route('/', adminTagRoutes)
