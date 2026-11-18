@@ -73,7 +73,7 @@ const extensions = computed(() => [
 // shallowRef，不是 ref：CodeMirror 的 EditorView 是带 getter 的类实例，
 // Vue 的 UnwrapRef 深度展开会把它结构化成一个丢了原型方法的假类型，
 // vue-tsc 会报 "missing dispatchTransactions/_root/..." 这类莫名其妙的错。
-// 项目里旧的 sync.ts 用的是裸变量，同一个道理，这里换成 shallowRef 规避。
+// 上一代 ojnext 的 shared/composables/sync.ts 用的是裸变量，同一个道理，这里换成 shallowRef 规避。
 const editorView = shallowRef<EditorView | null>(null)
 
 /** 房间开着，而且开的就是这道题 */

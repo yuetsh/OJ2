@@ -4,7 +4,7 @@ import type { TaskBoardStudent } from 'utils/types'
 
 /**
  * 任务页的「请假」框：勾今天不在的人。规则在任务页那边（只有今天还没交过的人能算请假、
- * 交了题或举手就自动算到，见 board.vue 的 canLeave），这里只管勾。
+ * 交了题或举手就自动算到，见 task/index.vue 的 canLeave），这里只管勾。
  */
 const props = defineProps<{
   /** 能勾的人：今天还没交过的（刚上课时就是全班），按名字排好 */

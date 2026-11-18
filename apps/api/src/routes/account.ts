@@ -26,7 +26,7 @@ import { getBooleanOption } from '../services/options'
 import { sniffImageExtension } from '../services/image'
 import { getUserProfileById } from '../services/profile'
 import { clientIp, countAttempt, lockoutRemaining, type AttemptRule } from '../services/throttling'
-import { audienceWhere, loadEntrants, SOLVED_RESULTS, standings } from '../services/ranking'
+import { audienceWhere, loadEntrants, rankedStudents, SOLVED_RESULTS, standings } from '../services/ranking'
 import { localTime, termStart, weekStart } from '../time'
 import { asRecord, isTeacherOrAbove, sampleUser } from './helpers'
 
@@ -332,14 +332,8 @@ accountRoutes.get('/rankings/weekly', optionalAuth, async (c) => {
 
   const start = weekStart()
 
-  // 入榜人群与排名页一致（routes/ranking.ts 的 rankedStudents）：正常状态的学生与学生管理员，
-  // 老师设成不计入排名的不算
-  const audience = and(
-    inArray(schema.user.adminType, [...STUDENT_ROLES]),
-    eq(schema.user.isDisabled, false),
-    isNull(schema.user.rankHiddenAt),
-    className ? eq(schema.user.className, className) : undefined,
-  )
+  // 入榜人群与排名页同一份：正常状态的学生与学生管理员，老师设成不计入排名的不算
+  const audience = and(rankedStudents, className ? eq(schema.user.className, className) : undefined)
   const thisWeek = and(isNull(schema.submission.contestId), gte(schema.submission.createTime, start), audience)
 
   const earlier = alias(schema.submission, 'earlier')

@@ -1168,7 +1168,7 @@ export const user = pgTable(
     // 而这张表原来只有主键和 username 两个索引，那句统计是全表扫。
     index('user_active_idx').using('btree', table.isDisabled.asc().nullsLast(), table.lastLogin.desc().nullsFirst()),
     // 按班级 / 按年级（class_name like '241%'）取学生：班级榜、班级对比、AI 学情的
-    // 排名 scope 都走它，见 routes/classroom.ts 的 loadClassUsers。
+    // 排名 scope 都走它，见 services/ranking.ts 的 audienceWhere。
     index('user_class_name_idx').using('btree', table.className.asc().nullsLast()),
   ],
 )
@@ -1620,7 +1620,7 @@ export const dataAnalysisProgress = pgTable(
 )
 
 /**
- * 「数据标注」的一节（代码里叫 labeling），设计见 docs/specs/2026-11-17-data-labeling-data-analysis-design.md。
+ * 「数据标注」的一节（代码里叫 labeling），设计见 docs/specs/2026-11-17-data-labeling-lab-design.md。
  * 实验室板块、试验性质：下面三张表只被这个板块用，别的表不外键指向它们，下线就是一份 drop 迁移。
  * `kind` 建节时定、之后不改（text 文字分类 / image 图片分类 / span 实体标注 / box 框选）；`labels` 是这一节的标签（实体标注里是类别）。
  */

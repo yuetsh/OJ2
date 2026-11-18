@@ -88,8 +88,8 @@ function selectUser(id: number) {
  * 任何匿名请求都能 `?top=0&limit=250` 翻走全校学生名单和个性签名 ——
  * 而 `/profiles/:username` 恰恰为了收紧枚举面才做了「匿名一律返回空」。
  *
- * 排序口径与公开榜单一致（见 routes/account.ts 的 leaderboardOrder）：
- * AC 降序 → 提交数升序 → id 升序，第三档保证翻页稳定。
+ * 排序：AC 降序 → 提交数升序 → id 升序，第三档保证翻页稳定。
+ * 和排名页不是一个口径：排名页同分按先做到排，见 services/ranking.ts。
  */
 adminAccountRoutes.get('/rankings/users', requireSuperAdmin, async (c) => {
   const limit = queryInteger(c.req.query('limit'), 10, { min: 1, max: 250 })

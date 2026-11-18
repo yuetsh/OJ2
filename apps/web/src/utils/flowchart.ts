@@ -3,7 +3,7 @@ import type { FlowchartCaseReport, FlowchartCaseResult } from '@oj2/contract'
 /**
  * 读出一次流程图评分里「走例子」的报告（2026-10 起的评法）；老提交是四项分，给 null。
  *
- * 形状真相在写入侧（后端 flowchart/run.ts 的 parseTrace），这里只按约定取、缺了兜底，
+ * 形状真相在写入侧（后端 flowchart/run.ts 的 evaluateByRunning），这里只按约定取、缺了兜底，
  * 不做运行时校验（理由见 apps/web/CLAUDE.md「什么该收紧」）。
  */
 export function caseReport(details: Record<string, unknown> | null | undefined) {
